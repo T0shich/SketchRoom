@@ -21,6 +21,16 @@ const io = new Server(httpServer, {
 io.on('connection', (socket) =>{
   console.log('Подключился' , socket.id);
 
+
+ socket.on('startDrawing', data => {
+		socket.broadcast.emit('startDrawing', data)
+ })
+
+ socket.on('drawing', data => {
+		socket.broadcast.emit('drawing', data)
+ })
+
+
   socket.on('disconnect' , () =>{
       console.log('Отключился', socket.id)
   })
