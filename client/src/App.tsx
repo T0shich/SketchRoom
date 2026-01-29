@@ -2,6 +2,7 @@ import './App.css'
 import { io } from 'socket.io-client'
 import { useState, useEffect } from 'react'
 import { DrawingCanvas } from './canvas/DrawingCanvas'
+import { Rooms } from './components/Rooms'
 function App() {
 	const [isConnecting, setIsConnecting] = useState(false)
 	const [socketId, setSocketId] = useState<string>('')
@@ -28,6 +29,7 @@ function App() {
 				{isConnecting ? `Подключен ${socketId}` : `Отключено`}
 			</div>
 			<div className=''>
+				<Rooms />
 				<DrawingCanvas />
 			</div>
 		</>

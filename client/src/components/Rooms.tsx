@@ -1,6 +1,5 @@
 import axios from 'axios'
 import { useState } from 'react'
-import { generateRandomKey } from '../utils/GenerateRandomKey'
 
 export const Rooms = () => {
 	const [isCreating, setIsCreating] = useState(false)
@@ -27,7 +26,6 @@ export const Rooms = () => {
 	}
 
 	const handleCreateRoom = () => {
-		setRoomKey(generateRandomKey())
 		createRoom()
 		setIsCreating(true)
 		setIsJoining(false)
