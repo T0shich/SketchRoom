@@ -1,84 +1,82 @@
 import { useEffect, useRef, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
-export const DrawingCanvas = () => {
-	const canvasRef = useRef<HTMLCanvasElement>(null)
-	const socketRef = useRef<Socket | null>(null)
-	const [isDrawing, setIsDrawing] = useState(false)
+import { Socket } from 'socket.io-client'
 
-	useEffect(() => {
-		const socket = io('http://localhost:3000')
-		socketRef.current = socket
-		socket.on('startDrawing', data => {
-			const canvas = canvasRef.current
-			const ctx = canvas?.getContext('2d')
-			if (!ctx) return
+interface DrawingCanvasProps {
+    socket: Socket | null
+    roomKey: string
+}
 
-			ctx.beginPath() // ← НОВЫЙ ПУТЬ!
-			ctx.moveTo(data.x, data.y)
-		})
+export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [isDrawing, setIsDrawing] = useState(false)
 
-		socket.on('drawing', data => {
-			const canvas = canvasRef.current
-			const ctx = canvas?.getContext('2d')
-			if (!ctx) return
+    useEffect(() => {
+        if (!socket) return
 
-			ctx.lineTo(data.x, data.y)
-			ctx.stroke()
-		})
+        const handleStartDrawing = (data: { x: number; y: number }) => {
+            const ctx = canvasRef.current?.getContext('2d')
+            if (!ctx) return
+            ctx.beginPath()
+            ctx.moveTo(data.x, data.y)
+        }
 
-		return () => {
-			socket.disconnect()
-		}
-	}, [])
+        const handleDrawing = (data: { x: number; y: number }) => {
+            const ctx = canvasRef.current?.getContext('2d')
+            if (!ctx) return
+            ctx.lineTo(data.x, data.y)
+            ctx.stroke()
+        }
 
-	const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-		const canvas = canvasRef.current
-		const ctx = canvas?.getContext('2d')
-		if (!ctx) return
+        socket.on('startDrawing', handleStartDrawing)
+        socket.on('drawing', handleDrawing)
 
-    const x = e.nativeEvent.offsetX
-		const y = e.nativeEvent.offsetY
+        return () => {
+            socket.off('startDrawing', handleStartDrawing)
+            socket.off('drawing', handleDrawing)
+        }
+    }, [socket])
 
-		setIsDrawing(true)
-		ctx.beginPath()
-		ctx.moveTo(x, y)
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const ctx = canvasRef.current?.getContext('2d')
+        if (!ctx) return
 
-		socketRef.current?.emit('startDrawing', { x, y })
-	}
+        const x = e.nativeEvent.offsetX
+        const y = e.nativeEvent.offsetY
 
-	const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-		if (!isDrawing) return
+        setIsDrawing(true)
+        ctx.beginPath()
+        ctx.moveTo(x, y)
 
-		const canvas = canvasRef.current
-		const ctx = canvas?.getContext('2d')
-		if (!ctx) return
+        socket?.emit('startDrawing', { x, y, roomKey })
+    }
 
-		const x = e.nativeEvent.offsetX
-		const y = e.nativeEvent.offsetY
+    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!isDrawing) return
 
-		ctx.lineTo(x, y)
-		ctx.stroke()
+        const ctx = canvasRef.current?.getContext('2d')
+        if (!ctx) return
 
-		socketRef.current?.emit('drawing', {
-			x: x,
-			y: y,
-		})
-	}
+        const x = e.nativeEvent.offsetX
+        const y = e.nativeEvent.offsetY
 
-	const stopDrawing = () => {
-		setIsDrawing(false)
-	}
+        ctx.lineTo(x, y)
+        ctx.stroke()
 
-	return (
-		<canvas
-			ref={canvasRef}
-			width={800}
-			height={600}
-			onMouseDown={startDrawing}
-			onMouseMove={draw}
-			onMouseUp={stopDrawing}
-			onMouseLeave={stopDrawing}
-			style={{ border: '1px solid black', cursor: 'crosshair' }}
-		/>
-	)
+        socket?.emit('drawing', { x, y, roomKey })
+    }
+
+    const stopDrawing = () => setIsDrawing(false)
+
+    return (
+        <canvas
+            ref={canvasRef}
+            width={800}
+            height={600}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            style={{ border: '1px solid black', cursor: 'crosshair' }}
+        />
+    )
 }

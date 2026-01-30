@@ -1,32 +1,47 @@
 import axios from 'axios'
 import { useState } from 'react'
 
-export const Rooms = () => {
+interface RoomsProps {
+	onJoinRoom: (key: string) => void
+}
+export const Rooms = ({ onJoinRoom }: RoomsProps) => {
 	const [isCreating, setIsCreating] = useState(false)
 	const [isJoining, setIsJoining] = useState(false)
 	const [roomKey, setRoomKey] = useState<string>('')
+	const [inputKey, setInputKey] = useState<string>('')
 
-	const createRoom = () => {
+	const createRoom = async () => {
 		try {
-			axios.post('http://localhost:3000/rooms', { key: roomKey })
-
-			console.log('Комната создана')
+			const response = await axios.post('http://localhost:3000/rooms')
+			const { key } = response.data
+			setRoomKey(key)
+			onJoinRoom(key)
+			console.log('Комната создана', key)
 		} catch (error) {
 			console.error('Ошибка при создании комнаты:', error)
 		}
 	}
 
-	const joinRoom = (key: string) => {
+	const joinRoom = async (key: string) => {
 		try {
-			axios.get(`http://localhost:3000/rooms/${key}`)
-			console.log('Присоединение к комнате')
-		} catch (error) {
+			const response = await axios.get(`http://localhost:3000/rooms/${key}`)
+			if (response.data.exists) {
+				setRoomKey(response.data.key)
+				onJoinRoom(response.data.key)
+				console.log('Присоединение к комнате:', key)
+			}
+		} catch (error: any) {
+			if (error.response?.status === 404) {
+				console.error('Комната не найдена')
+			} else {
+				console.error('Ошибка при присоединении к комнате')
+			}
 			console.error('Ошибка при присоединении к комнате:', error)
 		}
 	}
 
-	const handleCreateRoom = () => {
-		createRoom()
+	const handleCreateRoom = async () => {
+		await createRoom()
 		setIsCreating(true)
 		setIsJoining(false)
 	}
@@ -43,7 +58,7 @@ export const Rooms = () => {
 				<button onClick={handleJoinRoom}>Присоединиться</button>
 			</div>
 
-			{isCreating && (
+			{isCreating && roomKey && (
 				<div className='create-room'>
 					Комната создана! Номер комнаты: {roomKey}
 				</div>
@@ -53,9 +68,10 @@ export const Rooms = () => {
 					<input
 						type='text'
 						placeholder='Введите номер комнаты'
-						onChange={e => setRoomKey(e.target.value)}
+						value={inputKey}
+						onChange={e => setInputKey(e.target.value.toUpperCase())}
 					/>
-					<button type='submit' onClick={() => joinRoom(roomKey)}>
+					<button type='submit' onClick={() => joinRoom(inputKey)}>
 						Присоединиться
 					</button>
 				</div>

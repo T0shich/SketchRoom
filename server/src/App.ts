@@ -1,15 +1,59 @@
-import express from 'express';
-import cors from 'cors';
-import {Server} from 'socket.io'
-import {createServer} from 'http'
+import cors from 'cors'
+import express from 'express'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const httpServer = createServer(app);
+interface Room {
+	key: string
+	createdAt: Date
+	users: string[]
+}
 
-app.use(cors());
-app.use(express.json());
+const app = express()
+const PORT = process.env.PORT || 3000
+const httpServer = createServer(app)
 
+const rooms = new Map<string, Room>()
+
+app.use(cors())
+app.use(express.json())
+
+//Room creation endpoint
+const generateRoomKey = () => {
+	return Math.random().toString(36).substring(2, 8).toUpperCase()
+}
+
+app.post('/rooms', (req, res) => {
+	const key = generateRoomKey()
+	const room: Room = {
+		key,
+		createdAt: new Date(),
+		users: [],
+	}
+
+	rooms.set(key, room)
+	console.log(`Комната создана с ключом: ${key}`)
+	res.status(201).json({ key })
+})
+
+app.get('/rooms/:key', (req, res) => {
+	const { key } = req.params
+	const room = rooms.get(key.toUpperCase())
+
+	if (room) {
+		res.json({ exists: true, key: room.key })
+		console.log(`Вы подключились к комнате`)
+	} else {
+		res.status(404).json({ exists: false, message: 'Комната не найдена' })
+	}
+})
+
+app.get('/rooms', (req, res) => {
+	const allRooms = Array.from(rooms.values())
+	res.json(allRooms)
+})
+
+// WebSocket setup
 const io = new Server(httpServer, {
 	cors: {
 		origin: '*',
@@ -17,118 +61,42 @@ const io = new Server(httpServer, {
 	},
 })
 
-// Хранение активных комнат
-const rooms = new Map<string, { users: Set<string>, createdAt: Date }>();
+io.on('connection', socket => {
+	console.log('Подключился', socket.id)
 
-// REST API для комнат
-app.post('/rooms', (req, res) => {
-  const { key } = req.body;
-  
-  if (!key) {
-    return res.status(400).json({ error: 'Необходим ключ комнаты' });
-  }
-  
-  if (rooms.has(key)) {
-    return res.status(409).json({ error: 'Комната уже существует' });
-  }
-  
-  rooms.set(key, { users: new Set(), createdAt: new Date() });
-  console.log(`Комната ${key} создана через REST API`);
-  
-  res.status(201).json({ 
-    success: true, 
-    roomKey: key,
-    message: 'Комната создана' 
-  });
-});
+	socket.on('joinRoom', (roomKey: string) => {
+		const room = rooms.get(roomKey.toUpperCase())
+		if (room) {
+			socket.join(roomKey.toUpperCase())
+			room.users.push(socket.id)
+			console.log(`${socket.id} присоединился к комнате ${roomKey}`)
+			socket.emit('joinedRoom', { success: true, roomKey })
+		} else {
+		}
+	})
 
-app.get('/rooms/:key', (req, res) => {
-  const { key } = req.params;
-  
-  if (!rooms.has(key)) {
-    return res.status(404).json({ error: 'Комната не найдена' });
-  }
-  
-  const room = rooms.get(key);
-  res.json({ 
-    success: true,
-    roomKey: key,
-    usersCount: room?.users.size || 0,
-    exists: true
-  });
-});
+	socket.on('startDrawing', data => {
+		const { roomKey, ...drawingData } = data
+		if (roomKey) {
+			socket.to(roomKey.toUpperCase()).emit('startDrawing', drawingData)
+		} else {
+			socket.broadcast.emit('startDrawing', data)
+		}
+	})
+	socket.on('drawing', data => {
+		const { roomKey, ...drawingData } = data
+		if (roomKey) {
+			socket.to(roomKey.toUpperCase()).emit('drawing', drawingData)
+		} else {
+			socket.broadcast.emit('drawing', data)
+		}
+	})
 
-app.get('/rooms', (req, res) => {
-  const roomsList = Array.from(rooms.entries()).map(([key, data]) => ({
-    roomKey: key,
-    usersCount: data.users.size,
-    createdAt: data.createdAt
-  }));
-  
-  res.json({ rooms: roomsList });
-});
-
-io.on('connection', (socket) =>{
-  console.log('Подключился' , socket.id);
-
-  // Присоединение к комнате через Socket.IO
-  socket.on('joinRoom', (data: { roomKey: string }) => {
-    const { roomKey } = data;
-    if (rooms.has(roomKey)) {
-      const room = rooms.get(roomKey);
-      room?.users.add(socket.id);
-      socket.join(roomKey);
-      
-      io.to(roomKey).emit('userJoined', {
-        roomKey,
-        userId: socket.id,
-        usersCount: room?.users.size || 0
-      });
-      
-      console.log(`Пользователь ${socket.id} присоединился к комнате ${roomKey}`);
-    } else {
-      socket.emit('roomError', { message: 'Комната не найдена' });
-      console.log(`Комната ${roomKey} не существует`);
-    }
-  });
-
-  // Рисование внутри комнаты
-  socket.on('startDrawing', data => {
-    const { roomId } = data;
-    if (roomId) {
-      socket.to(roomId).emit('startDrawing', data);
-    }
-  });
-
-  socket.on('drawing', data => {
-    const { roomId } = data;
-    if (roomId) {
-      socket.to(roomId).emit('drawing', data);
-    }
-  });
-
-  // Отключение
-  socket.on('disconnect', () => {
-    console.log('Отключился', socket.id);
-    
-    // Удаление пользователя из всех комнат
-    rooms.forEach((roomData, roomKey) => {
-      if (roomData.users.has(socket.id)) {
-        roomData.users.delete(socket.id);
-        io.to(roomKey).emit('userLeft', {
-          userId: socket.id,
-          usersCount: roomData.users.size
-        });
-        
-        // Удаление пустой комнаты
-        if (roomData.users.size === 0) {
-          rooms.delete(roomKey);
-          console.log(`Комната ${roomKey} удалена (пустая)`);
-        }
-      }
-    });
-  });
+	socket.on('disconnect', () => {
+		console.log('Отключился', socket.id)
+	})
 })
 
-httpServer.listen(PORT,() =>{
- console.log(`Сервер на порту ${PORT}`)})
+httpServer.listen(PORT, () => {
+	console.log(`Сервер на порту ${PORT}`)
+})
