@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios , {AxiosError} from 'axios'
 import { useState } from 'react'
 
 interface RoomsProps {
@@ -30,13 +30,14 @@ export const Rooms = ({ onJoinRoom }: RoomsProps) => {
 				onJoinRoom(response.data.key)
 				console.log('Присоединение к комнате:', key)
 			}
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as AxiosError
 			if (error.response?.status === 404) {
 				console.error('Комната не найдена')
 			} else {
 				console.error('Ошибка при присоединении к комнате')
 			}
-			console.error('Ошибка при присоединении к комнате:', error)
+			console.error('Ошибка при присоединении к комнате:', error.message)
 		}
 	}
 
