@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { Toolbar } from '../components/Toolbar'
+import { usePastImage } from '../hooks/usePasteImage'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -9,7 +10,7 @@ interface DrawingCanvasProps {
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const [isDrawing, setIsDrawing] = useState(false)
-
+	usePastImage({canvasRef})
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
