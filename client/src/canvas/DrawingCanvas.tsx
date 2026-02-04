@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { Toolbar } from '../components/Toolbar'
 import { usePastImage } from '../hooks/usePasteImage'
+import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -9,145 +10,79 @@ interface DrawingCanvasProps {
 
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
-	const [isDrawing, setIsDrawing] = useState(false)
-	usePastImage({canvasRef})
+	const fabricRef = useRef<Canvas | null>(null)
+	usePastImage({ canvasRef })
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
 
 	useEffect(() => {
-		const canvas = canvasRef.current
-		if (!canvas) return
+		if (!canvasRef.current) return
 
-		const resizeCanvas = () => {
-			canvas.width = window.innerWidth
-			canvas.height = window.innerHeight
-		}
+		const canvas = new Canvas(canvasRef.current, {
+			width: window.innerWidth,
+			height: window.innerHeight,
+			isDrawingMode: true,
+		})
 
-		resizeCanvas()
-		window.addEventListener('resize', resizeCanvas)
+		// Создаём кисть вручную!
+		canvas.freeDrawingBrush = new PencilBrush(canvas)
+		canvas.freeDrawingBrush.color = brushColor
+		canvas.freeDrawingBrush.width = brushSize
 
-		return () => window.removeEventListener('resize', resizeCanvas)
-	}, [])
-
-	useEffect(() => {
-		if (!socket) return
-
-		const handleStartDrawing = (data: {
-			x: number
-			y: number
-			color?: string
-			size?: number
-			isEraser?: boolean
-		}) => {
-			const ctx = canvasRef.current?.getContext('2d')
-			if (!ctx) return
-
-			if (data.isEraser) {
-				ctx.globalCompositeOperation = 'destination-out'
-			} else {
-				ctx.globalCompositeOperation = 'source-over'
-				ctx.strokeStyle = data.color || '#000000'
-			}
-			ctx.lineWidth = data.size || 3
-			ctx.lineCap = 'round'
-			ctx.lineJoin = 'round'
-			ctx.beginPath()
-			ctx.moveTo(data.x, data.y)
-		}
-
-		const handleDrawing = (data: {
-			x: number
-			y: number
-			color?: string
-			size?: number
-			isEraser?: boolean
-		}) => {
-			const ctx = canvasRef.current?.getContext('2d')
-			if (!ctx) return
-
-			if (data.isEraser) {
-				ctx.globalCompositeOperation = 'destination-out'
-			} else {
-				ctx.globalCompositeOperation = 'source-over'
-				ctx.strokeStyle = data.color || '#000000'
-			}
-			ctx.lineWidth = data.size || 3
-			ctx.lineTo(data.x, data.y)
-			ctx.stroke()
-		}
-
-		socket.on('startDrawing', handleStartDrawing)
-		socket.on('drawing', handleDrawing)
+		fabricRef.current = canvas
 
 		return () => {
-			socket.off('startDrawing', handleStartDrawing)
-			socket.off('drawing', handleDrawing)
+			canvas.dispose()
 		}
+	}, [])
+	useEffect(() => {
+		if (!fabricRef.current?.freeDrawingBrush) return
+		fabricRef.current.freeDrawingBrush.color = brushColor
+		fabricRef.current.freeDrawingBrush.width = brushSize
+	}, [brushColor, brushSize])
+
+	useEffect(() => {
+		if (!socket || !fabricRef.current) return
+
+		socket.on('object:added_s', data => {
+			const { object } = data
+
+			util.enlivenObjects([object]).then(object => {
+				object.forEach(obj => {
+					if (obj instanceof FabricObject) {
+						fabricRef.current?.add(obj)
+					}
+				})
+				fabricRef.current?.renderAll()
+			})
+		})
+
+		socket.on('object:modified_s', data => {
+			const { object } = data
+
+			util.enlivenObjects([object]).then(object => {
+				object.forEach(obj => {
+					if (obj instanceof FabricObject) {
+						fabricRef.current?.add(obj)
+					}
+				})
+				fabricRef.current?.renderAll()
+			})
+		})
 	}, [socket])
 
-	const getContext = () => {
-		const ctx = canvasRef.current?.getContext('2d')
-		if (ctx) {
-			if (isEraser) {
-				ctx.globalCompositeOperation = 'destination-out'
-				ctx.lineWidth = brushSize
-			} else {
-				ctx.globalCompositeOperation = 'source-over'
-				ctx.strokeStyle = brushColor
-				ctx.lineWidth = brushSize
-			}
-			ctx.lineCap = 'round'
-			ctx.lineJoin = 'round'
-		}
-		return ctx
-	}
+	useEffect(() => {
+		if (!fabricRef.current || !socket) return
 
-	const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-		const ctx = getContext()
-		if (!ctx) return
-
-		const x = e.nativeEvent.offsetX
-		const y = e.nativeEvent.offsetY
-
-		setIsDrawing(true)
-		ctx.beginPath()
-		ctx.moveTo(x, y)
-
-		socket?.emit('startDrawing', {
-			x,
-			y,
-			roomKey,
-			color: brushColor,
-			size: brushSize,
-			isEraser,
+		fabricRef.current.on('path:created', e => {
+			socket.emit('object:added', { roomKey, object: e.path.toJSON() })
 		})
-	}
 
-	const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-		if (!isDrawing) return
-
-		const ctx = getContext()
-		if (!ctx) return
-
-		const x = e.nativeEvent.offsetX
-		const y = e.nativeEvent.offsetY
-
-		ctx.lineTo(x, y)
-		ctx.stroke()
-
-		socket?.emit('drawing', {
-			x,
-			y,
-			roomKey,
-			color: brushColor,
-			size: brushSize,
-			isEraser,
+		fabricRef.current.on('object:modified', e => {
+			socket.emit('object:modified', { roomKey, object: e.target.toJSON() })
 		})
-	}
-
-	const stopDrawing = () => setIsDrawing(false)
-
+	}, [socket, roomKey])
 	return (
 		<>
 			<Toolbar
@@ -157,23 +92,15 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				setBrushSize={setBrushSize}
 				isEraser={isEraser}
 				setIsEraser={setIsEraser}
-			/>
-
-			<canvas
-				ref={canvasRef}
-				onMouseDown={startDrawing}
-				onMouseMove={draw}
-				onMouseUp={stopDrawing}
-				onMouseLeave={stopDrawing}
-				className='block cursor-crosshair bg-white'
-				style={{
-					display: 'block',
-					margin: 0,
-					padding: 0,
-					width: '100vw',
-					height: '100vh',
+				onClear={() => {
+					fabricRef.current?.getObjects().forEach(obj => {
+						fabricRef.current?.remove(obj)
+					})
+					fabricRef.current?.renderAll()
 				}}
 			/>
+
+			<canvas ref={canvasRef} />
 		</>
 	)
 }

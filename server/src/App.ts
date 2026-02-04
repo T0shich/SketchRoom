@@ -75,20 +75,16 @@ io.on('connection', socket => {
 		}
 	})
 
-	socket.on('startDrawing', data => {
-		const { roomKey, ...drawingData } = data
+	socket.on('object:added', data => {
+		const { roomKey, object } = data
 		if (roomKey) {
-			socket.to(roomKey.toUpperCase()).emit('startDrawing', drawingData)
-		} else {
-			socket.broadcast.emit('startDrawing', data)
+			socket.to(roomKey.toUpperCase()).emit('object:added_s', { object })
 		}
 	})
-	socket.on('drawing', data => {
-		const { roomKey, ...drawingData } = data
+	socket.on('object:modified', data => {
+		const { roomKey, object } = data
 		if (roomKey) {
-			socket.to(roomKey.toUpperCase()).emit('drawing', drawingData)
-		} else {
-			socket.broadcast.emit('drawing', data)
+			socket.to(roomKey.toUpperCase()).emit('object:modified_s', { object })
 		}
 	})
 

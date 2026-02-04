@@ -5,6 +5,7 @@ interface ToolbarProps {
 	setBrushSize: (size: number) => void
 	isEraser: boolean
 	setIsEraser: (isEraser: boolean) => void
+	onClear: () => void
 }
 
 export const Toolbar = ({
@@ -14,6 +15,7 @@ export const Toolbar = ({
 	setBrushSize,
 	isEraser,
 	setIsEraser,
+	onClear
 }: ToolbarProps) => {
 	const colors = [
 		'#000000',
@@ -65,13 +67,7 @@ export const Toolbar = ({
 					🧹 Ластик
 				</button>
 				<button
-					onClick={() => {
-						const canvas = document.querySelector('canvas')
-						const ctx = canvas?.getContext('2d')
-						if (ctx && canvas) {
-							ctx.clearRect(0, 0, canvas.width, canvas.height)
-						}
-					}}
+					onClick={onClear}
 					className='px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600'
 				>
 					🗑️ Очистить
