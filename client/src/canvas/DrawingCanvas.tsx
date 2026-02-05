@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { Toolbar } from '../components/Toolbar'
-import { usePastImage } from '../hooks/usePasteImage'
+import { usePasteImage } from '../hooks/usePasteImage'
 import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
 interface DrawingCanvasProps {
 	socket: Socket | null
@@ -11,10 +11,15 @@ interface DrawingCanvasProps {
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const fabricRef = useRef<Canvas | null>(null)
-	usePastImage({ canvasRef })
+	usePasteImage({ fabricRef })
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
+	const [isDrawingMode, setIsDrawingMode] = useState(false)
+	useEffect(() => {
+		if(!fabricRef.current) return 
+		fabricRef.current.isDrawingMode = isDrawingMode
+	}, [isDrawingMode])
 
 	useEffect(() => {
 		if (!canvasRef.current) return
@@ -25,7 +30,6 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 			isDrawingMode: true,
 		})
 
-		// Создаём кисть вручную!
 		canvas.freeDrawingBrush = new PencilBrush(canvas)
 		canvas.freeDrawingBrush.color = brushColor
 		canvas.freeDrawingBrush.width = brushSize
@@ -98,6 +102,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 					})
 					fabricRef.current?.renderAll()
 				}}
+				isDrawingMode = {isDrawingMode}
+				setIsDrawingMode={setIsDrawingMode}
 			/>
 
 			<canvas ref={canvasRef} />
