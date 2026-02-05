@@ -59,6 +59,7 @@ const io = new Server(httpServer, {
 		origin: '*',
 		methods: ['GET', 'POST'],
 	},
+	maxHttpBufferSize: 10e6,
 })
 
 io.on('connection', socket => {
@@ -79,6 +80,8 @@ io.on('connection', socket => {
 		const { roomKey, object } = data
 		if (roomKey) {
 			socket.to(roomKey.toUpperCase()).emit('object:added_s', { object })
+
+			console.log(`Новый объект ${object}`)
 		}
 	})
 	socket.on('object:modified', data => {

@@ -1,61 +1,73 @@
 import { useEffect, type RefObject } from 'react'
 import { Canvas, FabricImage } from 'fabric'
+import { Socket } from 'socket.io-client'
 
 interface Props {
 	fabricRef: RefObject<Canvas | null>
+	socket: Socket | null
+	roomKey: string
 }
 
-export const usePasteImage = ({ fabricRef }: Props) => {
+export const usePasteImage = ({ fabricRef, socket, roomKey }: Props) => {
 	useEffect(() => {
-		const handlePaste = (e: ClipboardEvent) => {
+		const handlePaste = async (e: ClipboardEvent) => {
 			const fabricCanvas = fabricRef.current
 			if (!fabricCanvas) return
+
 			const items = e.clipboardData?.items
 			if (!items) return
 
 			for (const item of items) {
 				if (item.type.startsWith('image/')) {
 					const blob = item.getAsFile()
-					console.log(blob)
 					if (!blob) continue
 
-					const objectUrl = URL.createObjectURL(blob)
+					const reader = new FileReader()
+					reader.onload = async () => {
+						const dataUrl = reader.result as string
 
-					const img = new Image()
+						try {
+							// Используем fromURL для создания FabricImage
+							const fabricImg = await FabricImage.fromURL(
+								dataUrl,
+								{
+									crossOrigin: 'anonymous',
+								},
+								{
+									left: fabricCanvas.width! / 2,
+									top: fabricCanvas.height! / 2,
+									originX: 'center',
+									originY: 'center',
+								},
+							)
 
-					img.onload = () => {
-						const fabricImg = new FabricImage(img, {
-							left: fabricCanvas.width! / 2,
-							top: fabricCanvas.height! / 2,
+							fabricCanvas.add(fabricImg)
+							fabricCanvas.setActiveObject(fabricImg)
+							fabricCanvas.renderAll()
 
-							hasControls: true, 
-							hasBorders: true, 
-							lockMovementX: false,
-							lockMovementY: false, // заблокировать перемещение по Y
-							lockRotation: false, // заблокировать поворот
-							lockScalingX: false, // заблокировать масштаб по X
-							lockScalingY: false,
-							originX: 'center',
-							originY: 'center',
-						})
-						fabricCanvas.add(fabricImg)
-						fabricCanvas.setActiveObject(fabricImg)
-						fabricCanvas.renderAll()
-						URL.revokeObjectURL(objectUrl)
+							// Отправляем на сервер
+							if (socket) {
+								socket.emit('object:added', {
+									roomKey,
+									object: fabricImg.toObject(),
+								})
+								console.log('=== ОТПРАВКА ===')
+								console.log('roomKey:', roomKey)
+								console.log('object type:', fabricImg.type)
+								console.log('object src:', fabricImg.getSrc?.() || 'нет src')
+								console.log('object:', fabricImg.toObject())
+							}
+						} catch (err) {
+							console.error('Ошибка создания изображения:', err)
+						}
 					}
-					console.log(`URL: ${objectUrl}`)
 
-					img.onerror = err => {
-						console.error('Ошибка загрузки изображения:', err)
-						URL.revokeObjectURL(objectUrl)
-					}
-
-					img.src = objectUrl
+					reader.readAsDataURL(blob)
 				}
 			}
 		}
 
 		document.addEventListener('paste', handlePaste)
 		return () => document.removeEventListener('paste', handlePaste)
-	}, [fabricRef])
+	}, [fabricRef, socket, roomKey])
 }

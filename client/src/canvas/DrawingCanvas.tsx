@@ -11,14 +11,18 @@ interface DrawingCanvasProps {
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
 	const fabricRef = useRef<Canvas | null>(null)
-	usePasteImage({ fabricRef })
+	usePasteImage({ fabricRef, socket, roomKey })
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
 	const [isDrawingMode, setIsDrawingMode] = useState(false)
 	useEffect(() => {
-		if(!fabricRef.current) return 
+		if (!fabricRef.current) return
 		fabricRef.current.isDrawingMode = isDrawingMode
+
+		const objects = fabricRef.current.getObjects()
+
+		console.log(objects)
 	}, [isDrawingMode])
 
 	useEffect(() => {
@@ -51,6 +55,10 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 
 		socket.on('object:added_s', data => {
 			const { object } = data
+			console.log('=== ПОЛУЧЕНИЕ ===')
+			console.log('data:', data)
+			console.log('object type:', data.object?.type)
+			console.log('object src:', data.object?.src?.substring(0, 100))
 
 			util.enlivenObjects([object]).then(object => {
 				object.forEach(obj => {
@@ -102,7 +110,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 					})
 					fabricRef.current?.renderAll()
 				}}
-				isDrawingMode = {isDrawingMode}
+				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
 			/>
 
