@@ -1,32 +1,61 @@
 import { useEffect, type RefObject } from 'react'
+import { Canvas, FabricImage } from 'fabric'
 
 interface Props {
-    canvasRef: RefObject<HTMLCanvasElement | null>  
+	fabricRef: RefObject<Canvas | null>
 }
-export const usePastImage = ({ canvasRef }: Props) => {
+
+export const usePasteImage = ({ fabricRef }: Props) => {
 	useEffect(() => {
-		const canvas = canvasRef.current
-		if(!canvas) return
 		const handlePaste = (e: ClipboardEvent) => {
+			const fabricCanvas = fabricRef.current
+			if (!fabricCanvas) return
 			const items = e.clipboardData?.items
 			if (!items) return
 
 			for (const item of items) {
 				if (item.type.startsWith('image/')) {
 					const blob = item.getAsFile()
-					if (!blob) return
+					console.log(blob)
+					if (!blob) continue
+
+					const objectUrl = URL.createObjectURL(blob)
 
 					const img = new Image()
+
 					img.onload = () => {
-						const ctx = canvas.getContext('2d')
-						ctx?.drawImage(img, 0, 0)
-						URL.revokeObjectURL(img.src)
+						const fabricImg = new FabricImage(img, {
+							left: fabricCanvas.width! / 2,
+							top: fabricCanvas.height! / 2,
+
+							hasControls: true, 
+							hasBorders: true, 
+							lockMovementX: false,
+							lockMovementY: false, // заблокировать перемещение по Y
+							lockRotation: false, // заблокировать поворот
+							lockScalingX: false, // заблокировать масштаб по X
+							lockScalingY: false,
+							originX: 'center',
+							originY: 'center',
+						})
+						fabricCanvas.add(fabricImg)
+						fabricCanvas.setActiveObject(fabricImg)
+						fabricCanvas.renderAll()
+						URL.revokeObjectURL(objectUrl)
 					}
-					img.src = URL.createObjectURL(blob)
+					console.log(`URL: ${objectUrl}`)
+
+					img.onerror = err => {
+						console.error('Ошибка загрузки изображения:', err)
+						URL.revokeObjectURL(objectUrl)
+					}
+
+					img.src = objectUrl
 				}
 			}
 		}
+
 		document.addEventListener('paste', handlePaste)
 		return () => document.removeEventListener('paste', handlePaste)
-	}, [canvasRef])
+	}, [fabricRef])
 }

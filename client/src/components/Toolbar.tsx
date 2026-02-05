@@ -6,6 +6,8 @@ interface ToolbarProps {
 	isEraser: boolean
 	setIsEraser: (isEraser: boolean) => void
 	onClear: () => void
+	isDrawingMode: boolean
+	setIsDrawingMode: (isDrawingMode: boolean) => void
 }
 
 export const Toolbar = ({
@@ -15,7 +17,9 @@ export const Toolbar = ({
 	setBrushSize,
 	isEraser,
 	setIsEraser,
-	onClear
+	onClear,
+	isDrawingMode,
+	setIsDrawingMode,
 }: ToolbarProps) => {
 	const colors = [
 		'#000000',
@@ -71,6 +75,9 @@ export const Toolbar = ({
 					className='px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600'
 				>
 					🗑️ Очистить
+				</button>
+				<button onClick={() => setIsDrawingMode(!isDrawingMode)}>
+					{isDrawingMode ? '✏️ Рисование' : '👆 Выделение'}
 				</button>
 			</div>
 		</div>
