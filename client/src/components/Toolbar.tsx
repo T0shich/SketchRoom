@@ -1,10 +1,10 @@
+
 interface ToolbarProps {
 	brushColor: string
 	setBrushColor: (color: string) => void
 	brushSize: number
 	setBrushSize: (size: number) => void
-	isEraser: boolean
-	setIsEraser: (isEraser: boolean) => void
+	
 	onClear: () => void
 	isDrawingMode: boolean
 	setIsDrawingMode: (isDrawingMode: boolean) => void
@@ -15,8 +15,6 @@ export const Toolbar = ({
 	setBrushColor,
 	brushSize,
 	setBrushSize,
-	isEraser,
-	setIsEraser,
 	onClear,
 	isDrawingMode,
 	setIsDrawingMode,
@@ -31,6 +29,7 @@ export const Toolbar = ({
 		'#00ffff',
 		'#ffffff',
 	]
+
 
 	return (
 		<div className='container'>
@@ -47,9 +46,8 @@ export const Toolbar = ({
 							key={color}
 							onClick={() => {
 								setBrushColor(color)
-								setIsEraser(false)
 							}}
-							className={`w-6 h-6 rounded border-2 ${brushColor === color && !isEraser ? 'border-blue-500' : 'border-gray-300'}`}
+							className={`w-6 h-6 rounded border-2 ${brushColor === color ? 'border-blue-500' : 'border-gray-300'}`}
 							style={{ backgroundColor: color }}
 						></button>
 					))}
@@ -64,12 +62,8 @@ export const Toolbar = ({
 					/>
 					<span className='text-sm w-8'>{brushSize}px</span>
 				</div>
-				<button
-					onClick={() => setIsEraser(!isEraser)}
-					className={`px-3 py-2 rounded ${isEraser ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
-				>
-					🧹 Ластик
-				</button>
+			
+
 				<button
 					onClick={onClear}
 					className='px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600'

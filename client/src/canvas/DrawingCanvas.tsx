@@ -15,6 +15,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
+	const [prevColor , setPrevColor] = useState('#000000')
 	const [isDrawingMode, setIsDrawingMode] = useState(false)
 	useEffect(() => {
 		if (!fabricRef.current) return
@@ -33,6 +34,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 			height: window.innerHeight,
 			isDrawingMode: true,
 		})
+		canvas.backgroundColor = '#ffffff'; 
+		canvas.renderAll();
 
 		canvas.freeDrawingBrush = new PencilBrush(canvas)
 		canvas.freeDrawingBrush.color = brushColor
@@ -102,8 +105,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				setBrushColor={setBrushColor}
 				brushSize={brushSize}
 				setBrushSize={setBrushSize}
-				isEraser={isEraser}
-				setIsEraser={setIsEraser}
+			
 				onClear={() => {
 					fabricRef.current?.getObjects().forEach(obj => {
 						fabricRef.current?.remove(obj)
@@ -113,6 +115,17 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
 			/>
+
+			<button onClick={() => {
+				
+				setIsEraser(false)
+				setBrushColor(prevColor)
+			}}>Карандаш</button>
+			<button onClick={() => {
+				setPrevColor(brushColor)
+				setIsEraser(true)
+				setBrushColor('#ffffff')
+			}}>Ластик</button>
 
 			<canvas ref={canvasRef} />
 		</>
