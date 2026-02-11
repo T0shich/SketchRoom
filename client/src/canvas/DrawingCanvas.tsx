@@ -4,6 +4,7 @@ import { Toolbar } from '../components/Toolbar'
 import { usePasteImage } from '../hooks/usePasteImage'
 import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
 import Zoom from '../components/Zoom'
+import ViewportScroller from '../components/ViewportScroller'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -43,6 +44,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 		canvas.freeDrawingBrush.width = brushSize
 
 		fabricRef.current = canvas
+
+		console.log(fabricRef.current)
 
 		return () => {
 			canvas.dispose()
@@ -134,7 +137,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				Ластик
 			</button>
 
-			<Zoom fabricRef={fabricRef}/>
+			<Zoom fabricRef={fabricRef} />
+			<ViewportScroller fabricRef={fabricRef} />
 
 			<canvas ref={canvasRef} />
 		</>
