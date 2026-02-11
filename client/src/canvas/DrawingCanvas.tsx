@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client'
 import { Toolbar } from '../components/Toolbar'
 import { usePasteImage } from '../hooks/usePasteImage'
 import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
+import Zoom from '../components/Zoom'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -15,7 +16,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
-	const [prevColor , setPrevColor] = useState('#000000')
+	const [prevColor, setPrevColor] = useState('#000000')
 	const [isDrawingMode, setIsDrawingMode] = useState(false)
 	useEffect(() => {
 		if (!fabricRef.current) return
@@ -34,8 +35,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 			height: window.innerHeight,
 			isDrawingMode: true,
 		})
-		canvas.backgroundColor = '#ffffff'; 
-		canvas.renderAll();
+		canvas.backgroundColor = '#ffffff'
+		canvas.renderAll()
 
 		canvas.freeDrawingBrush = new PencilBrush(canvas)
 		canvas.freeDrawingBrush.color = brushColor
@@ -105,7 +106,6 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				setBrushColor={setBrushColor}
 				brushSize={brushSize}
 				setBrushSize={setBrushSize}
-			
 				onClear={() => {
 					fabricRef.current?.getObjects().forEach(obj => {
 						fabricRef.current?.remove(obj)
@@ -116,16 +116,25 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				setIsDrawingMode={setIsDrawingMode}
 			/>
 
-			<button onClick={() => {
-				
-				setIsEraser(false)
-				setBrushColor(prevColor)
-			}}>Карандаш</button>
-			<button onClick={() => {
-				setPrevColor(brushColor)
-				setIsEraser(true)
-				setBrushColor('#ffffff')
-			}}>Ластик</button>
+			<button
+				onClick={() => {
+					setIsEraser(false)
+					setBrushColor(prevColor)
+				}}
+			>
+				Карандаш
+			</button>
+			<button
+				onClick={() => {
+					setPrevColor(brushColor)
+					setIsEraser(true)
+					setBrushColor('#ffffff')
+				}}
+			>
+				Ластик
+			</button>
+
+			<Zoom fabricRef={fabricRef}/>
 
 			<canvas ref={canvasRef} />
 		</>
