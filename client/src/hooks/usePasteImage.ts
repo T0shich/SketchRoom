@@ -1,16 +1,18 @@
-import { useEffect, type RefObject } from 'react'
-import { Canvas, FabricImage } from 'fabric'
+import { useEffect } from 'react'
+import {  FabricImage } from 'fabric'
 import { Socket } from 'socket.io-client'
-
+import { useFabric } from '../store/useFabric'
 interface Props {
-	fabricRef: RefObject<Canvas | null>
 	socket: Socket | null
 	roomKey: string
 }
 
-export const usePasteImage = ({ fabricRef, socket, roomKey }: Props) => {
+export const usePasteImage = ({ socket, roomKey }: Props) => {
+		const fabricRef = useFabric(state => state.fabricRef)
+
 	useEffect(() => {
 		const handlePaste = async (e: ClipboardEvent) => {
+			if(!fabricRef?.current) return 
 			const fabricCanvas = fabricRef.current
 			if (!fabricCanvas) return
 

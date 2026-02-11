@@ -1,12 +1,9 @@
-import React, { useState } from 'react'
-import { Canvas } from 'fabric'
-interface ScrollProps {
-	fabricRef: React.MutableRefObject<Canvas | null>
-}
-
-const ViewportScroller = ({ fabricRef }: ScrollProps) => {
+import  { useState } from 'react'
+import { useFabric } from '../store/useFabric'
+const ViewportScroller = () => {
 	const [scrollX, setScrollX] = useState(1)
 	const [scrollY, setScrollY] = useState(1)
+	const fabricRef = useFabric(state => state.fabricRef)
 
 	return (
 		<div>
@@ -17,7 +14,7 @@ const ViewportScroller = ({ fabricRef }: ScrollProps) => {
 				value={scrollX}
 				onChange={e => {
 					setScrollX(Number(e.target.value))
-					if (fabricRef.current) {
+					if (fabricRef?.current) {
 						fabricRef.current.viewportTransform[4] = Number(e.target.value)
 						fabricRef.current.renderAll()
 					}
@@ -30,7 +27,7 @@ const ViewportScroller = ({ fabricRef }: ScrollProps) => {
 				value={scrollY}
 				onChange={e => {
 					setScrollY(Number(e.target.value))
-					if (fabricRef.current) {
+					if (fabricRef?.current) {
 						fabricRef.current.viewportTransform[5] = Number(e.target.value)
 						fabricRef.current.renderAll()
 					}

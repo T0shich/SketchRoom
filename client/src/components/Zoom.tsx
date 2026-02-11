@@ -1,14 +1,13 @@
-import React, { useEffect, useState } from 'react'
-import { Canvas, Point } from 'fabric'
-interface ZoomProps {
-	fabricRef: React.MutableRefObject<Canvas | null>
-}
+import  { useEffect, useState } from 'react'
+import {  Point } from 'fabric'
+import { useFabric } from '../store/useFabric'
 
-const Zoom = ({ fabricRef }: ZoomProps) => {
+const Zoom = () => {
 	const [zoom, setZoom] = useState(1)
+	const fabricRef = useFabric(state => state.fabricRef)
 
 	useEffect(() => {
-		if (!fabricRef.current) return
+		if (!fabricRef?.current) return
 
 		const center = new Point(
 			fabricRef.current.getWidth() / 2,

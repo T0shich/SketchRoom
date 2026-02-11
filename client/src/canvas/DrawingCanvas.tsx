@@ -5,6 +5,8 @@ import { usePasteImage } from '../hooks/usePasteImage'
 import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
 import Zoom from '../components/Zoom'
 import ViewportScroller from '../components/ViewportScroller'
+import { useFabric } from '../store/useFabric'
+
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -12,21 +14,23 @@ interface DrawingCanvasProps {
 
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null)
-	const fabricRef = useRef<Canvas | null>(null)
-	usePasteImage({ fabricRef, socket, roomKey })
+
+	const { fabricRef, setFabricRef } = useFabric()
+
 	const [brushColor, setBrushColor] = useState('#000000')
 	const [brushSize, setBrushSize] = useState(3)
 	const [isEraser, setIsEraser] = useState(false)
 	const [prevColor, setPrevColor] = useState('#000000')
-	const [isDrawingMode, setIsDrawingMode] = useState(false)
+	const [isDrawingMode, setIsDrawingMode] = useState(true)
+
+	usePasteImage({  socket, roomKey })
+
 	useEffect(() => {
-		if (!fabricRef.current) return
+		if (!fabricRef?.current) return
 		fabricRef.current.isDrawingMode = isDrawingMode
-
 		const objects = fabricRef.current.getObjects()
-
 		console.log(objects)
-	}, [isDrawingMode])
+	}, [isDrawingMode, fabricRef])
 
 	useEffect(() => {
 		if (!canvasRef.current) return
@@ -43,22 +47,24 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 		canvas.freeDrawingBrush.color = brushColor
 		canvas.freeDrawingBrush.width = brushSize
 
-		fabricRef.current = canvas
-
-		console.log(fabricRef.current)
+		const tempRef = { current: canvas } as React.RefObject<Canvas | null>
+		setFabricRef(tempRef)
 
 		return () => {
 			canvas.dispose()
+			setFabricRef({ current: null })
 		}
+	
 	}, [])
-	useEffect(() => {
-		if (!fabricRef.current?.freeDrawingBrush) return
-		fabricRef.current.freeDrawingBrush.color = brushColor
-		fabricRef.current.freeDrawingBrush.width = brushSize
-	}, [brushColor, brushSize])
 
 	useEffect(() => {
-		if (!socket || !fabricRef.current) return
+		if (!fabricRef?.current?.freeDrawingBrush) return
+		fabricRef.current.freeDrawingBrush.color = brushColor
+		fabricRef.current.freeDrawingBrush.width = brushSize
+	}, [brushColor, brushSize, fabricRef])
+
+	useEffect(() => {
+		if (!socket || !fabricRef?.current) return
 
 		socket.on('object:added_s', data => {
 			const { object } = data
@@ -89,10 +95,10 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				fabricRef.current?.renderAll()
 			})
 		})
-	}, [socket])
+	}, [socket, fabricRef])
 
 	useEffect(() => {
-		if (!fabricRef.current || !socket) return
+		if (!fabricRef?.current || !socket) return
 
 		fabricRef.current.on('path:created', e => {
 			socket.emit('object:added', { roomKey, object: e.path.toJSON() })
@@ -101,7 +107,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 		fabricRef.current.on('object:modified', e => {
 			socket.emit('object:modified', { roomKey, object: e.target.toJSON() })
 		})
-	}, [socket, roomKey])
+	}, [socket, roomKey, fabricRef])
+
 	return (
 		<>
 			<Toolbar
@@ -110,10 +117,10 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				brushSize={brushSize}
 				setBrushSize={setBrushSize}
 				onClear={() => {
-					fabricRef.current?.getObjects().forEach(obj => {
-						fabricRef.current?.remove(obj)
+					fabricRef?.current?.getObjects().forEach(obj => {
+						fabricRef?.current?.remove(obj)
 					})
-					fabricRef.current?.renderAll()
+					fabricRef?.current?.renderAll()
 				}}
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
@@ -137,8 +144,8 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				Ластик
 			</button>
 
-			<Zoom fabricRef={fabricRef} />
-			<ViewportScroller fabricRef={fabricRef} />
+			<Zoom />
+			<ViewportScroller />
 
 			<canvas ref={canvasRef} />
 		</>
