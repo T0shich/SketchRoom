@@ -1,11 +1,11 @@
+import { Canvas, FabricObject, PencilBrush, util } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
-import { Toolbar } from '../components/Toolbar'
+import { useFabric } from '../../../store/useFabric'
+import { Toolbar } from './Toolbar'
+import {ViewportScroller} from './ViewportScroller'
+import {Zoom} from './Zoom'
 import { usePasteImage } from '../hooks/usePasteImage'
-import { Canvas, util, FabricObject, PencilBrush } from 'fabric'
-import Zoom from '../components/Zoom'
-import ViewportScroller from '../components/ViewportScroller'
-import { useFabric } from '../store/useFabric'
 
 interface DrawingCanvasProps {
 	socket: Socket | null
@@ -23,7 +23,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const [prevColor, setPrevColor] = useState('#000000')
 	const [isDrawingMode, setIsDrawingMode] = useState(true)
 
-	usePasteImage({  socket, roomKey })
+	usePasteImage({ socket, roomKey })
 
 	useEffect(() => {
 		if (!fabricRef?.current) return
@@ -54,7 +54,6 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 			canvas.dispose()
 			setFabricRef({ current: null })
 		}
-	
 	}, [])
 
 	useEffect(() => {

@@ -1,8 +1,8 @@
-import  { useEffect, useState } from 'react'
-import {  Point } from 'fabric'
-import { useFabric } from '../store/useFabric'
+import { Point } from 'fabric'
+import { useEffect, useState } from 'react'
+import { useFabric } from '../../../store/useFabric'
 
-const Zoom = () => {
+export const Zoom = () => {
 	const [zoom, setZoom] = useState(1)
 	const fabricRef = useFabric(state => state.fabricRef)
 
@@ -38,4 +38,3 @@ const Zoom = () => {
 	)
 }
 
-export default Zoom

@@ -1,6 +1,6 @@
-import  { useState } from 'react'
-import { useFabric } from '../store/useFabric'
-const ViewportScroller = () => {
+import { useState } from 'react'
+import { useFabric } from '../../../store/useFabric'
+export const ViewportScroller = () => {
 	const [scrollX, setScrollX] = useState(1)
 	const [scrollY, setScrollY] = useState(1)
 	const fabricRef = useFabric(state => state.fabricRef)
@@ -37,4 +37,3 @@ const ViewportScroller = () => {
 	)
 }
 
-export default ViewportScroller
