@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { useFabric } from '../../../store/useFabric'
 import { Toolbar } from './Toolbar'
-import {ViewportScroller} from './ViewportScroller'
-import {Zoom} from './Zoom'
+import { ViewportScroller } from './ViewportScroller'
+import { Zoom } from './Zoom'
 import { usePasteImage } from '../hooks/usePasteImage'
 
 interface DrawingCanvasProps {
@@ -12,15 +12,18 @@ interface DrawingCanvasProps {
 	roomKey: string
 }
 
-export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
-	const canvasRef = useRef<HTMLCanvasElement>(null)
+const INITIAL_BRUSH_COLOR = '#111827'
+const INITIAL_BRUSH_SIZE = 3
 
+export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
+	const wrapperRef = useRef<HTMLDivElement>(null)
+	const canvasRef = useRef<HTMLCanvasElement>(null)
+	const previousColorRef = useRef(INITIAL_BRUSH_COLOR)
 	const { fabricRef, setFabricRef } = useFabric()
 
-	const [brushColor, setBrushColor] = useState('#000000')
-	const [brushSize, setBrushSize] = useState(3)
+	const [brushColor, setBrushColor] = useState(INITIAL_BRUSH_COLOR)
+	const [brushSize, setBrushSize] = useState(INITIAL_BRUSH_SIZE)
 	const [isEraser, setIsEraser] = useState(false)
-	const [prevColor, setPrevColor] = useState('#000000')
 	const [isDrawingMode, setIsDrawingMode] = useState(true)
 
 	usePasteImage({ socket, roomKey })
@@ -28,33 +31,60 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	useEffect(() => {
 		if (!fabricRef?.current) return
 		fabricRef.current.isDrawingMode = isDrawingMode
-		const objects = fabricRef.current.getObjects()
-		console.log(objects)
 	}, [isDrawingMode, fabricRef])
 
+	const handleSetEraser = (nextIsEraser: boolean) => {
+		if (nextIsEraser) {
+			if (brushColor !== '#ffffff') {
+				previousColorRef.current = brushColor
+			}
+			setBrushColor('#ffffff')
+			setIsEraser(true)
+			return
+		}
+
+		if (brushColor === '#ffffff') {
+			setBrushColor(previousColorRef.current)
+		}
+
+		setIsEraser(false)
+	}
+
 	useEffect(() => {
-		if (!canvasRef.current) return
+		if (!canvasRef.current || !wrapperRef.current) return
 
 		const canvas = new Canvas(canvasRef.current, {
-			width: window.innerWidth,
-			height: window.innerHeight,
+			width: wrapperRef.current.clientWidth,
+			height: wrapperRef.current.clientHeight,
 			isDrawingMode: true,
 		})
 		canvas.backgroundColor = '#ffffff'
 		canvas.renderAll()
 
 		canvas.freeDrawingBrush = new PencilBrush(canvas)
-		canvas.freeDrawingBrush.color = brushColor
-		canvas.freeDrawingBrush.width = brushSize
+		canvas.freeDrawingBrush.color = INITIAL_BRUSH_COLOR
+		canvas.freeDrawingBrush.width = INITIAL_BRUSH_SIZE
 
 		const tempRef = { current: canvas } as React.RefObject<Canvas | null>
 		setFabricRef(tempRef)
 
+		const handleResize = () => {
+			if (!wrapperRef.current) return
+			canvas.setDimensions({
+				width: wrapperRef.current.clientWidth,
+				height: wrapperRef.current.clientHeight,
+			})
+			canvas.renderAll()
+		}
+
+		window.addEventListener('resize', handleResize)
+
 		return () => {
+			window.removeEventListener('resize', handleResize)
 			canvas.dispose()
 			setFabricRef({ current: null })
 		}
-	}, [])
+	}, [setFabricRef])
 
 	useEffect(() => {
 		if (!fabricRef?.current?.freeDrawingBrush) return
@@ -65,56 +95,72 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	useEffect(() => {
 		if (!socket || !fabricRef?.current) return
 
-		socket.on('object:added_s', data => {
-			const { object } = data
-			console.log('=== ПОЛУЧЕНИЕ ===')
-			console.log('data:', data)
-			console.log('object type:', data.object?.type)
-			console.log('object src:', data.object?.src?.substring(0, 100))
-
-			util.enlivenObjects([object]).then(object => {
-				object.forEach(obj => {
+		const handleAdded = (data: { object: unknown }) => {
+			util.enlivenObjects([data.object]).then(objects => {
+				objects.forEach(obj => {
 					if (obj instanceof FabricObject) {
 						fabricRef.current?.add(obj)
 					}
 				})
 				fabricRef.current?.renderAll()
 			})
-		})
+		}
 
-		socket.on('object:modified_s', data => {
-			const { object } = data
-
-			util.enlivenObjects([object]).then(object => {
-				object.forEach(obj => {
+		const handleModified = (data: { object: unknown }) => {
+			util.enlivenObjects([data.object]).then(objects => {
+				objects.forEach(obj => {
 					if (obj instanceof FabricObject) {
 						fabricRef.current?.add(obj)
 					}
 				})
 				fabricRef.current?.renderAll()
 			})
-		})
+		}
+
+		socket.on('object:added_s', handleAdded)
+		socket.on('object:modified_s', handleModified)
+
+		return () => {
+			socket.off('object:added_s', handleAdded)
+			socket.off('object:modified_s', handleModified)
+		}
 	}, [socket, fabricRef])
 
 	useEffect(() => {
 		if (!fabricRef?.current || !socket) return
+		const canvas = fabricRef.current
 
-		fabricRef.current.on('path:created', e => {
+		const onPathCreated = (e: { path: FabricObject }) => {
 			socket.emit('object:added', { roomKey, object: e.path.toJSON() })
-		})
+		}
 
-		fabricRef.current.on('object:modified', e => {
+		const onObjectModified = (e: { target: FabricObject }) => {
 			socket.emit('object:modified', { roomKey, object: e.target.toJSON() })
-		})
+		}
+
+		canvas.on('path:created', onPathCreated)
+		canvas.on('object:modified', onObjectModified)
+
+		return () => {
+			canvas.off('path:created', onPathCreated)
+			canvas.off('object:modified', onObjectModified)
+		}
 	}, [socket, roomKey, fabricRef])
 
 	return (
-		<>
+		<div ref={wrapperRef} className='relative h-full w-full bg-slate-50'>
 			<Toolbar
 				brushColor={brushColor}
-				setBrushColor={setBrushColor}
+				setBrushColor={color => {
+					setBrushColor(color)
+					if (color !== '#ffffff') {
+						previousColorRef.current = color
+					}
+				}}
 				brushSize={brushSize}
 				setBrushSize={setBrushSize}
+				isEraser={isEraser}
+				setIsEraser={handleSetEraser}
 				onClear={() => {
 					fabricRef?.current?.getObjects().forEach(obj => {
 						fabricRef?.current?.remove(obj)
@@ -124,29 +170,9 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
 			/>
-
-			<button
-				onClick={() => {
-					setIsEraser(false)
-					setBrushColor(prevColor)
-				}}
-			>
-				Карандаш
-			</button>
-			<button
-				onClick={() => {
-					setPrevColor(brushColor)
-					setIsEraser(true)
-					setBrushColor('#ffffff')
-				}}
-			>
-				Ластик
-			</button>
-
 			<Zoom />
 			<ViewportScroller />
-
-			<canvas ref={canvasRef} />
-		</>
+			<canvas ref={canvasRef} className='h-full w-full' />
+		</div>
 	)
 }

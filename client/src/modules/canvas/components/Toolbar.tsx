@@ -21,63 +21,54 @@ export const Toolbar = ({
 	isDrawingMode,
 	setIsDrawingMode,
 }: ToolbarProps) => {
-	const colors = [
-		'#000000',
-		'#ff0000',
-		'#00ff00',
-		'#0000ff',
-		'#ffff00',
-		'#ff00ff',
-		'#00ffff',
-		'#ffffff',
-	]
+	const colors = ['#111827', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#14b8a6', '#ffffff']
 
 	return (
-		<div className='container'>
-			<div className='inputs'>
-				<input
-					type='color'
-					value={brushColor}
-					onChange={e => setBrushColor(e.target.value)}
-					className=''
-				/>
-				<div className=''>
-					{colors.map(color => (
-						<button
-							key={color}
-							onClick={() => {
-								setBrushColor(color)
-								setIsEraser(false)
-							}}
-							className={`w-6 h-6 rounded border-2 ${brushColor === color && !isEraser ? 'border-blue-500' : 'border-gray-300'}`}
-							style={{ backgroundColor: color }}
-						></button>
-					))}
-				</div>
-				<div className=''>
-					<input
-						type='range'
-						min='1'
-						max='50'
-						value={brushSize}
-						onChange={e => setBrushSize(Number(e.target.value))}
+		<div className='absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur'>
+			<div className='flex items-center gap-2'>
+				{colors.map(color => (
+					<button
+						key={color}
+						onClick={() => {
+							setBrushColor(color)
+							setIsEraser(false)
+						}}
+						className={`h-6 w-6 rounded-full border transition ${brushColor === color && !isEraser ? 'border-slate-900 ring-2 ring-slate-300' : 'border-slate-300 hover:border-slate-500'}`}
+						style={{ backgroundColor: color }}
 					/>
-					<span className='text-sm w-8'>{brushSize}px</span>
-				</div>
+				))}
+			</div>
+
+			<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
+				<input
+					type='range'
+					min='1'
+					max='50'
+					value={brushSize}
+					onChange={e => setBrushSize(Number(e.target.value))}
+					className='accent-slate-700'
+				/>
+				<span className='w-10 text-xs text-slate-500'>{brushSize}px</span>
+			</div>
+
+			<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
+				<button
+					onClick={() => setIsDrawingMode(!isDrawingMode)}
+					className={`rounded-lg px-3 py-2 text-xs font-medium transition ${isDrawingMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+				>
+					{isDrawingMode ? 'Рисование' : 'Выделение'}
+				</button>
 				<button
 					onClick={() => setIsEraser(!isEraser)}
-					className={`px-3 py-2 rounded ${isEraser ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+					className={`rounded-lg px-3 py-2 text-xs font-medium transition ${isEraser ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
 				>
-					🧹 Ластик
+					Ластик
 				</button>
 				<button
 					onClick={onClear}
-					className='px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600'
+					className='rounded-lg bg-rose-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-rose-600'
 				>
-					🗑️ Очистить
-				</button>
-				<button onClick={() => setIsDrawingMode(!isDrawingMode)}>
-					{isDrawingMode ? '✏️ Рисование' : '👆 Выделение'}
+					Очистить
 				</button>
 			</div>
 		</div>
