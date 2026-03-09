@@ -5,12 +5,19 @@ import { Rooms } from '../modules/rooms'
 import { Layout } from '../components/Layout'
 import SideBar from '../components/SideBar'
 
+interface JoinedRoomResponse {
+	success: boolean
+	roomKey?: string
+	message?: string
+}
+
 const socket: Socket = io('http://localhost:3000')
 
 const EditorPage = () => {
 	const [isConnecting, setIsConnecting] = useState(false)
 	const [socketId, setSocketId] = useState<string>('')
 	const [roomKey, setRoomKey] = useState<string | null>(null)
+	const [joinError, setJoinError] = useState<string>('')
 
 	useEffect(() => {
 		socket.on('connect', () => {
@@ -21,10 +28,17 @@ const EditorPage = () => {
 		socket.on('disconnect', () => {
 			setIsConnecting(false)
 			setSocketId('')
+			setRoomKey(null)
 		})
 
-		socket.on('joinedRoom', response => {
-			console.log('joinedRoom:', response)
+		socket.on('joinedRoom', (response: JoinedRoomResponse) => {
+			if (response.success && response.roomKey) {
+				setRoomKey(response.roomKey)
+				setJoinError('')
+				return
+			}
+
+			setJoinError(response.message || 'Не удалось войти в комнату')
 		})
 
 		return () => {
@@ -36,7 +50,13 @@ const EditorPage = () => {
 
 	const handleJoinRoom = (key: string) => {
 		const upperKey = key.toUpperCase()
-		setRoomKey(upperKey)
+		setJoinError('')
+
+		if (!socket.connected) {
+			setJoinError('Нет соединения с сервером')
+			return
+		}
+
 		socket.emit('joinRoom', upperKey)
 	}
 
@@ -50,6 +70,7 @@ const EditorPage = () => {
 						{isConnecting ? `Подключено • ${socketId}` : 'Подключение к серверу...'}
 					</div>
 					<Rooms onJoinRoom={handleJoinRoom} />
+					{joinError && <div className='mt-3 text-sm text-rose-500'>{joinError}</div>}
 				</div>
 			</div>
 		)
@@ -62,9 +83,7 @@ const EditorPage = () => {
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>Комната {roomKey}</div>
-						<div className='text-xs text-slate-500'>
-							{isConnecting ? 'Онлайн' : 'Офлайн'}
-						</div>
+						<div className='text-xs text-slate-500'>{isConnecting ? 'Онлайн' : 'Офлайн'}</div>
 					</div>
 					<div className='min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
 						<DrawingCanvas socket={socket} roomKey={roomKey} />

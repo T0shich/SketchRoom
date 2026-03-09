@@ -9,6 +9,15 @@ interface Room {
 	users: string[]
 }
 
+interface CanvasObjectPayload {
+	roomKey?: string
+	object?: unknown
+}
+
+interface CanvasClearPayload {
+	roomKey?: string
+}
+
 const app = express()
 const PORT = process.env.PORT || 3000
 const httpServer = createServer(app)
@@ -18,9 +27,14 @@ const rooms = new Map<string, Room>()
 app.use(cors())
 app.use(express.json())
 
-//Room creation endpoint
 const generateRoomKey = () => {
 	return Math.random().toString(36).substring(2, 8).toUpperCase()
+}
+
+const normalizeRoomKey = (roomKey?: string) => {
+	if (typeof roomKey !== 'string') return null
+	const normalized = roomKey.trim().toUpperCase()
+	return normalized.length ? normalized : null
 }
 
 app.post('/rooms', (req, res) => {
@@ -37,12 +51,19 @@ app.post('/rooms', (req, res) => {
 })
 
 app.get('/rooms/:key', (req, res) => {
-	const { key } = req.params
-	const room = rooms.get(key.toUpperCase())
+	const normalizedKey = normalizeRoomKey(req.params.key)
+	if (!normalizedKey) {
+		res
+			.status(400)
+			.json({ exists: false, message: 'Некорректный ключ комнаты' })
+		return
+	}
+
+	const room = rooms.get(normalizedKey)
 
 	if (room) {
 		res.json({ exists: true, key: room.key })
-		console.log(`Вы подключились к комнате`)
+		console.log(`Вы подключились к комнате ${room.key}`)
 	} else {
 		res.status(404).json({ exists: false, message: 'Комната не найдена' })
 	}
@@ -53,7 +74,6 @@ app.get('/rooms', (req, res) => {
 	res.json(allRooms)
 })
 
-// WebSocket setup
 const io = new Server(httpServer, {
 	cors: {
 		origin: '*',
@@ -66,32 +86,89 @@ io.on('connection', socket => {
 	console.log('Подключился', socket.id)
 
 	socket.on('joinRoom', (roomKey: string) => {
-		const room = rooms.get(roomKey.toUpperCase())
-		if (room) {
-			socket.join(roomKey.toUpperCase())
+		const normalizedKey = normalizeRoomKey(roomKey)
+		if (!normalizedKey) {
+			socket.emit('joinedRoom', {
+				success: false,
+				message: 'Некорректный ключ комнаты',
+			})
+			return
+		}
+
+		const room = rooms.get(normalizedKey)
+		if (!room) {
+			socket.emit('joinedRoom', {
+				success: false,
+				message: 'Комната не найдена',
+				roomKey: normalizedKey,
+			})
+			return
+		}
+
+		const currentRoomKey = normalizeRoomKey(socket.data.roomKey)
+		if (currentRoomKey && currentRoomKey !== normalizedKey) {
+			socket.leave(currentRoomKey)
+			const previousRoom = rooms.get(currentRoomKey)
+			if (previousRoom) {
+				previousRoom.users = previousRoom.users.filter(
+					userId => userId !== socket.id,
+				)
+			}
+		}
+
+		socket.join(normalizedKey)
+		socket.data.roomKey = normalizedKey
+		if (!room.users.includes(socket.id)) {
 			room.users.push(socket.id)
-			console.log(`${socket.id} присоединился к комнате ${roomKey}`)
-			socket.emit('joinedRoom', { success: true, roomKey })
-		} else {
 		}
+
+		console.log(`${socket.id} присоединился к комнате ${normalizedKey}`)
+		socket.emit('joinedRoom', { success: true, roomKey: normalizedKey })
 	})
 
-	socket.on('object:added', data => {
-		const { roomKey, object } = data
-		if (roomKey) {
-			socket.to(roomKey.toUpperCase()).emit('object:added_s', { object })
+	socket.on('object:added', (data: CanvasObjectPayload) => {
+		const normalizedKey = normalizeRoomKey(data?.roomKey)
+		if (!normalizedKey || !data?.object) return
+		if (
+			socket.data.roomKey !== normalizedKey ||
+			!socket.rooms.has(normalizedKey)
+		)
+			return
+		if (!rooms.has(normalizedKey)) return
 
-			console.log(`Новый объект ${object}`)
-		}
+		socket.to(normalizedKey).emit('object:added_s', { object: data.object })
 	})
-	socket.on('object:modified', data => {
-		const { roomKey, object } = data
-		if (roomKey) {
-			socket.to(roomKey.toUpperCase()).emit('object:modified_s', { object })
-		}
+
+	socket.on('object:modified', (data: CanvasObjectPayload) => {
+		const normalizedKey = normalizeRoomKey(data?.roomKey)
+		if (!normalizedKey || !data?.object) return
+		if (
+			socket.data.roomKey !== normalizedKey ||
+			!socket.rooms.has(normalizedKey)
+		)
+			return
+		if (!rooms.has(normalizedKey)) return
+
+		socket.to(normalizedKey).emit('object:modified_s', { object: data.object })
+	})
+
+	socket.on('canvas:clear', (data: CanvasClearPayload) => {
+		const normalizedKey = normalizeRoomKey(data?.roomKey)
+		if (!normalizedKey) return
+		if (
+			socket.data.roomKey !== normalizedKey ||
+			!socket.rooms.has(normalizedKey)
+		)
+			return
+		if (!rooms.has(normalizedKey)) return
+
+		socket.to(normalizedKey).emit('canvas:clear_s')
 	})
 
 	socket.on('disconnect', () => {
+		for (const room of rooms.values()) {
+			room.users = room.users.filter(userId => userId !== socket.id)
+		}
 		console.log('Отключился', socket.id)
 	})
 })

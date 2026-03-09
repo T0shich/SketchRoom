@@ -2,18 +2,48 @@ import { Canvas, FabricObject, PencilBrush, util } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import { useFabric } from '../../../store/useFabric'
+import { usePasteImage } from '../hooks/usePasteImage'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
-import { usePasteImage } from '../hooks/usePasteImage'
 
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
 }
 
+type SocketObjectData = Record<string, unknown> & { socketObjectId?: string }
+
 const INITIAL_BRUSH_COLOR = '#111827'
 const INITIAL_BRUSH_SIZE = 3
+const SOCKET_OBJECT_ID = 'socketObjectId'
+
+const createSocketObjectId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
+const getSocketObjectId = (object: FabricObject | SocketObjectData | null | undefined) => {
+	if (!object) return undefined
+	if (object instanceof FabricObject) {
+		const value = object.get(SOCKET_OBJECT_ID)
+		return typeof value === 'string' ? value : undefined
+	}
+
+	const value = object[SOCKET_OBJECT_ID]
+	return typeof value === 'string' ? value : undefined
+}
+
+const ensureSocketObjectId = (object: FabricObject) => {
+	let objectId = getSocketObjectId(object)
+	if (!objectId) {
+		objectId = createSocketObjectId()
+		object.set(SOCKET_OBJECT_ID, objectId)
+	}
+	return objectId
+}
+
+const serializeObject = (object: FabricObject) => {
+	ensureSocketObjectId(object)
+	return object.toObject([SOCKET_OBJECT_ID]) as SocketObjectData
+}
 
 export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const wrapperRef = useRef<HTMLDivElement>(null)
@@ -95,34 +125,78 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	useEffect(() => {
 		if (!socket || !fabricRef?.current) return
 
-		const handleAdded = (data: { object: unknown }) => {
+		const handleAdded = (data: { object: SocketObjectData }) => {
+			if (!data?.object) return
+
 			util.enlivenObjects([data.object]).then(objects => {
+				const canvas = fabricRef.current
+				if (!canvas) return
+
 				objects.forEach(obj => {
-					if (obj instanceof FabricObject) {
-						fabricRef.current?.add(obj)
+					if (!(obj instanceof FabricObject)) return
+
+					const incomingId = getSocketObjectId(obj) || ensureSocketObjectId(obj)
+					if (incomingId) {
+						const existing = canvas
+							.getObjects()
+							.find(existingObj => getSocketObjectId(existingObj) === incomingId)
+						if (existing) return
 					}
+
+					canvas.add(obj)
 				})
-				fabricRef.current?.renderAll()
+				canvas.renderAll()
 			})
 		}
 
-		const handleModified = (data: { object: unknown }) => {
+		const handleModified = (data: { object: SocketObjectData }) => {
+			if (!data?.object) return
+
 			util.enlivenObjects([data.object]).then(objects => {
+				const canvas = fabricRef.current
+				if (!canvas) return
+
 				objects.forEach(obj => {
-					if (obj instanceof FabricObject) {
-						fabricRef.current?.add(obj)
+					if (!(obj instanceof FabricObject)) return
+
+					const incomingId = getSocketObjectId(obj)
+					if (!incomingId) {
+						return
 					}
+
+					const currentObjects = canvas.getObjects()
+					const existingIndex = currentObjects.findIndex(
+						existingObj => getSocketObjectId(existingObj) === incomingId,
+					)
+
+					if (existingIndex === -1) {
+						canvas.add(obj)
+						return
+					}
+
+					canvas.remove(currentObjects[existingIndex])
+					canvas.insertAt(existingIndex, obj)
 				})
-				fabricRef.current?.renderAll()
+				canvas.renderAll()
 			})
+		}
+
+		const handleClear = () => {
+			const canvas = fabricRef.current
+			if (!canvas) return
+
+			canvas.getObjects().forEach(obj => canvas.remove(obj))
+			canvas.renderAll()
 		}
 
 		socket.on('object:added_s', handleAdded)
 		socket.on('object:modified_s', handleModified)
+		socket.on('canvas:clear_s', handleClear)
 
 		return () => {
 			socket.off('object:added_s', handleAdded)
 			socket.off('object:modified_s', handleModified)
+			socket.off('canvas:clear_s', handleClear)
 		}
 	}, [socket, fabricRef])
 
@@ -131,11 +205,22 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 		const canvas = fabricRef.current
 
 		const onPathCreated = (e: { path: FabricObject }) => {
-			socket.emit('object:added', { roomKey, object: e.path.toJSON() })
+			socket.emit('object:added', { roomKey, object: serializeObject(e.path) })
 		}
 
 		const onObjectModified = (e: { target: FabricObject }) => {
-			socket.emit('object:modified', { roomKey, object: e.target.toJSON() })
+			const target = e.target
+			if (!target) return
+
+			const maybeSelection = target as FabricObject & { getObjects?: () => FabricObject[] }
+			if (target.type === 'activeSelection' && typeof maybeSelection.getObjects === 'function') {
+				maybeSelection.getObjects().forEach(obj => {
+					socket.emit('object:modified', { roomKey, object: serializeObject(obj) })
+				})
+				return
+			}
+
+			socket.emit('object:modified', { roomKey, object: serializeObject(target) })
 		}
 
 		canvas.on('path:created', onPathCreated)
@@ -166,6 +251,9 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 						fabricRef?.current?.remove(obj)
 					})
 					fabricRef?.current?.renderAll()
+					if (socket) {
+						socket.emit('canvas:clear', { roomKey })
+					}
 				}}
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}

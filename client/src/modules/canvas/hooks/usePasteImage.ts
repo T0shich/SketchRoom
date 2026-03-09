@@ -2,10 +2,14 @@ import { FabricImage } from 'fabric'
 import { useEffect } from 'react'
 import { Socket } from 'socket.io-client'
 import { useFabric } from '../../../store/useFabric'
+
 interface Props {
 	socket: Socket | null
 	roomKey: string
 }
+
+const createSocketObjectId = () =>
+	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
 export const usePasteImage = ({ socket, roomKey }: Props) => {
 	const fabricRef = useFabric(state => state.fabricRef)
@@ -14,58 +18,57 @@ export const usePasteImage = ({ socket, roomKey }: Props) => {
 		const handlePaste = async (e: ClipboardEvent) => {
 			if (!fabricRef?.current) return
 			const fabricCanvas = fabricRef.current
-			if (!fabricCanvas) return
 
 			const items = e.clipboardData?.items
 			if (!items) return
 
 			for (const item of items) {
-				if (item.type.startsWith('image/')) {
-					const blob = item.getAsFile()
-					if (!blob) continue
+				if (!item.type.startsWith('image/')) continue
 
-					const reader = new FileReader()
-					reader.onload = async () => {
-						const dataUrl = reader.result as string
+				const blob = item.getAsFile()
+				if (!blob) continue
 
-						try {
-							// Используем fromURL для создания FabricImage
-							const fabricImg = await FabricImage.fromURL(
-								dataUrl,
-								{
-									crossOrigin: 'anonymous',
-								},
-								{
-									left: fabricCanvas.width! / 2,
-									top: fabricCanvas.height! / 2,
-									originX: 'center',
-									originY: 'center',
-								},
-							)
+				const reader = new FileReader()
+				reader.onload = async () => {
+					const dataUrl = reader.result as string
 
-							fabricCanvas.add(fabricImg)
-							fabricCanvas.setActiveObject(fabricImg)
-							fabricCanvas.renderAll()
+					try {
+						const fabricImg = await FabricImage.fromURL(
+							dataUrl,
+							{
+								crossOrigin: 'anonymous',
+							},
+							{
+								left: fabricCanvas.width! / 2,
+								top: fabricCanvas.height! / 2,
+								originX: 'center',
+								originY: 'center',
+							},
+						)
 
-							// Отправляем на сервер
-							if (socket) {
-								socket.emit('object:added', {
-									roomKey,
-									object: fabricImg.toObject(),
-								})
-								console.log('=== ОТПРАВКА ===')
-								console.log('roomKey:', roomKey)
-								console.log('object type:', fabricImg.type)
-								console.log('object src:', fabricImg.getSrc?.() || 'нет src')
-								console.log('object:', fabricImg.toObject())
-							}
-						} catch (err) {
-							console.error('Ошибка создания изображения:', err)
+						fabricImg.set('socketObjectId', createSocketObjectId())
+						fabricCanvas.add(fabricImg)
+						fabricCanvas.setActiveObject(fabricImg)
+						fabricCanvas.renderAll()
+
+						if (socket) {
+							const serialized = fabricImg.toObject() as unknown as Record<
+								string,
+								unknown
+							>
+							serialized.socketObjectId = fabricImg.get('socketObjectId')
+
+							socket.emit('object:added', {
+								roomKey,
+								object: serialized,
+							})
 						}
+					} catch (err) {
+						console.error('Ошибка создания изображения:', err)
 					}
-
-					reader.readAsDataURL(blob)
 				}
+
+				reader.readAsDataURL(blob)
 			}
 		}
 
