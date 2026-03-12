@@ -184,6 +184,24 @@ io.on('connection', socket => {
 		socket.to(normalizedKey).emit('canvas:clear_s')
 	})
 
+	socket.on(
+		'object:removed',
+		(data: { roomKey?: string; objectId?: string }) => {
+			const normalizedKey = normalizeRoomKey(data?.roomKey)
+			if (!normalizedKey || !data?.objectId) return
+			if (
+				socket.data.roomKey !== normalizedKey ||
+				!socket.rooms.has(normalizedKey)
+			)
+				return
+			if (!rooms.has(normalizedKey)) return
+
+			socket
+				.to(normalizedKey)
+				.emit('object:removed_s', { objectId: data.objectId })
+		},
+	)
+
 	socket.on('disconnect', () => {
 		for (const [roomKey, room] of rooms.entries()) {
 			const leavingUser = room.users.find(user => user.id === socket.id)
