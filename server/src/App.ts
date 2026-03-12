@@ -3,10 +3,16 @@ import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
 
+interface User {
+	id: string
+	name?: string
+	admin?: boolean
+}
+
 interface Room {
 	key: string
 	createdAt: Date
-	users: string[]
+	users: User[]
 }
 
 interface CanvasObjectPayload {
@@ -121,7 +127,7 @@ io.on('connection', socket => {
 			const previousRoom = rooms.get(currentRoomKey)
 			if (previousRoom) {
 				previousRoom.users = previousRoom.users.filter(
-					userId => userId !== socket.id,
+					user => user.id !== socket.id,
 				)
 				emitRoomUsersUpdated(currentRoomKey)
 			}
@@ -129,8 +135,9 @@ io.on('connection', socket => {
 
 		socket.join(normalizedKey)
 		socket.data.roomKey = normalizedKey
-		if (!room.users.includes(socket.id)) {
-			room.users.push(socket.id)
+		if (!room.users.some(user => user.id === socket.id)) {
+			const isFirstUser = room.users.length === 0
+			room.users.push({ id: socket.id, admin: isFirstUser })
 		}
 		emitRoomUsersUpdated(normalizedKey)
 
@@ -179,11 +186,17 @@ io.on('connection', socket => {
 
 	socket.on('disconnect', () => {
 		for (const [roomKey, room] of rooms.entries()) {
-			const nextUsers = room.users.filter(userId => userId !== socket.id)
-			if (nextUsers.length !== room.users.length) {
-				room.users = nextUsers
-				emitRoomUsersUpdated(roomKey)
+			const leavingUser = room.users.find(user => user.id === socket.id)
+			if (!leavingUser) continue
+
+			room.users = room.users.filter(user => user.id !== socket.id)
+
+			// передать права администратора следующему пользователю
+			if (leavingUser.admin && room.users.length > 0) {
+				room.users[0].admin = true
 			}
+
+			emitRoomUsersUpdated(roomKey)
 		}
 		console.log('Отключился', socket.id)
 	})
