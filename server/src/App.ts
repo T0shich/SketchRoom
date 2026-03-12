@@ -62,7 +62,7 @@ app.get('/rooms/:key', (req, res) => {
 	const room = rooms.get(normalizedKey)
 
 	if (room) {
-		res.json({ exists: true, key: room.key })
+		res.json({ exists: true, key: room.key, users: room.users })
 		console.log(`Вы подключились к комнате ${room.key}`)
 	} else {
 		res.status(404).json({ exists: false, message: 'Комната не найдена' })
@@ -81,6 +81,16 @@ const io = new Server(httpServer, {
 	},
 	maxHttpBufferSize: 10e6,
 })
+
+const emitRoomUsersUpdated = (roomKey: string) => {
+	const room = rooms.get(roomKey)
+	if (!room) return
+
+	io.to(roomKey).emit('roomUsersUpdated', {
+		roomKey,
+		users: [...room.users],
+	})
+}
 
 io.on('connection', socket => {
 	console.log('Подключился', socket.id)
@@ -113,6 +123,7 @@ io.on('connection', socket => {
 				previousRoom.users = previousRoom.users.filter(
 					userId => userId !== socket.id,
 				)
+				emitRoomUsersUpdated(currentRoomKey)
 			}
 		}
 
@@ -121,6 +132,7 @@ io.on('connection', socket => {
 		if (!room.users.includes(socket.id)) {
 			room.users.push(socket.id)
 		}
+		emitRoomUsersUpdated(normalizedKey)
 
 		console.log(`${socket.id} присоединился к комнате ${normalizedKey}`)
 		socket.emit('joinedRoom', { success: true, roomKey: normalizedKey })
@@ -166,8 +178,12 @@ io.on('connection', socket => {
 	})
 
 	socket.on('disconnect', () => {
-		for (const room of rooms.values()) {
-			room.users = room.users.filter(userId => userId !== socket.id)
+		for (const [roomKey, room] of rooms.entries()) {
+			const nextUsers = room.users.filter(userId => userId !== socket.id)
+			if (nextUsers.length !== room.users.length) {
+				room.users = nextUsers
+				emitRoomUsersUpdated(roomKey)
+			}
 		}
 		console.log('Отключился', socket.id)
 	})

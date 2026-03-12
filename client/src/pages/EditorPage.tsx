@@ -1,13 +1,13 @@
-import { io, Socket } from 'socket.io-client'
 import { useEffect, useState } from 'react'
-import { DrawingCanvas } from '../modules/canvas'
-import { Rooms } from '../modules/rooms'
+import { io, Socket } from 'socket.io-client'
 import { Layout } from '../components/Layout'
 import SideBar from '../components/SideBar'
+import { DrawingCanvas } from '../modules/canvas'
+import { Rooms } from '../modules/rooms'
 
 interface JoinedRoomResponse {
 	success: boolean
-	roomKey?: string
+	roomKey: string
 	message?: string
 }
 
@@ -79,7 +79,7 @@ const EditorPage = () => {
 	return (
 		<Layout>
 			<div className='flex h-full w-full'>
-				<SideBar />
+				<SideBar roomKey={roomKey} socket={socket} />
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>Комната {roomKey}</div>
