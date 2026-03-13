@@ -2,83 +2,19 @@ import cors from 'cors'
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
-
-interface User {
-	id: string
-	name?: string
-	admin?: boolean
-}
-
-interface Room {
-	key: string
-	createdAt: Date
-	users: User[]
-}
-
-interface CanvasObjectPayload {
-	roomKey?: string
-	object?: unknown
-}
-
-interface CanvasClearPayload {
-	roomKey?: string
-}
+import { RoomRoutes } from './routes/RoomRoutes'
+import { rooms } from './store/rooms'
+import { CanvasClearPayload, CanvasObjectPayload, User } from './types/Types'
+import { normalizeRoomKey } from './utils/NormalizeRoomKey'
 
 const app = express()
 const PORT = process.env.PORT || 3000
 const httpServer = createServer(app)
 
-const rooms = new Map<string, Room>()
-
 app.use(cors())
 app.use(express.json())
 
-const generateRoomKey = () => {
-	return Math.random().toString(36).substring(2, 8).toUpperCase()
-}
-
-const normalizeRoomKey = (roomKey?: string) => {
-	if (typeof roomKey !== 'string') return null
-	const normalized = roomKey.trim().toUpperCase()
-	return normalized.length ? normalized : null
-}
-
-app.post('/rooms', (req, res) => {
-	const key = generateRoomKey()
-	const room: Room = {
-		key,
-		createdAt: new Date(),
-		users: [],
-	}
-
-	rooms.set(key, room)
-	console.log(`Комната создана с ключом: ${key}`)
-	res.status(201).json({ key })
-})
-
-app.get('/rooms/:key', (req, res) => {
-	const normalizedKey = normalizeRoomKey(req.params.key)
-	if (!normalizedKey) {
-		res
-			.status(400)
-			.json({ exists: false, message: 'Некорректный ключ комнаты' })
-		return
-	}
-
-	const room = rooms.get(normalizedKey)
-
-	if (room) {
-		res.json({ exists: true, key: room.key, users: room.users })
-		console.log(`Вы подключились к комнате ${room.key}`)
-	} else {
-		res.status(404).json({ exists: false, message: 'Комната не найдена' })
-	}
-})
-
-app.get('/rooms', (req, res) => {
-	const allRooms = Array.from(rooms.values())
-	res.json(allRooms)
-})
+RoomRoutes(app)
 
 const io = new Server(httpServer, {
 	cors: {
@@ -127,7 +63,7 @@ io.on('connection', socket => {
 			const previousRoom = rooms.get(currentRoomKey)
 			if (previousRoom) {
 				previousRoom.users = previousRoom.users.filter(
-					user => user.id !== socket.id,
+					(user: User) => user.id !== socket.id,
 				)
 				emitRoomUsersUpdated(currentRoomKey)
 			}
@@ -135,7 +71,7 @@ io.on('connection', socket => {
 
 		socket.join(normalizedKey)
 		socket.data.roomKey = normalizedKey
-		if (!room.users.some(user => user.id === socket.id)) {
+		if (!room.users.some((user: User) => user.id === socket.id)) {
 			const isFirstUser = room.users.length === 0
 			room.users.push({ id: socket.id, admin: isFirstUser })
 		}
@@ -204,10 +140,10 @@ io.on('connection', socket => {
 
 	socket.on('disconnect', () => {
 		for (const [roomKey, room] of rooms.entries()) {
-			const leavingUser = room.users.find(user => user.id === socket.id)
+			const leavingUser = room.users.find((user: User) => user.id === socket.id)
 			if (!leavingUser) continue
 
-			room.users = room.users.filter(user => user.id !== socket.id)
+			room.users = room.users.filter((user: User) => user.id !== socket.id)
 
 			// передать права администратора следующему пользователю
 			if (leavingUser.admin && room.users.length > 0) {
