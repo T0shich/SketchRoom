@@ -74,6 +74,7 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 
 	usePasteImage({ socket, roomKey })
 
+
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current
 		if (!canvas?.freeDrawingBrush) return
