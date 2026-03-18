@@ -3,6 +3,7 @@ import 'dotenv/config'
 import express from 'express'
 import { createServer } from 'http'
 import { RoomRoutes } from './routes/RoomRoutes'
+import { AuthRoutes } from './routes/AuthRoutes'
 import { initSockets } from './sockets'
 import { prisma } from './types/Prisma'
 const app = express()
@@ -14,7 +15,7 @@ app.use(cors())
 app.use(express.json())
 
 RoomRoutes(app)
-
+AuthRoutes(app)
 initSockets(httpServer)
 
 app.get('/users', async (req, res) => {

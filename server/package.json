@@ -6,7 +6,13 @@
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"dev": "nodemon",
 		"start": "node dist/app.js",
-		"build": "tsc"
+		"build": "tsc",
+		"prisma:generate": "prisma generate",
+		"prisma:migrate": "prisma migrate dev",
+		"prisma:status": "prisma migrate status"
+	},
+	"prisma": {
+		"schema": "prisma/schema"
 	},
 	"keywords": [],
 	"author": "",
