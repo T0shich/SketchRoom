@@ -28,10 +28,6 @@ const EditorPage = () => {
 	const [roomKey, setRoomKey] = useState<string | null>(null)
 	const [joinError, setJoinError] = useState<string>('')
 
-	if (!authenticated || !token || !user) {
-		return <Navigate to='/login' replace />
-	}
-
 	useEffect(() => {
 		socket.on('connect', () => {
 			setIsConnecting(true)
@@ -71,6 +67,10 @@ const EditorPage = () => {
 		}
 
 		socket.emit('joinRoom', upperKey)
+	}
+
+	if (!authenticated || !token || !user) {
+		return <Navigate to='/login' replace />
 	}
 
 	if (!roomKey) {
