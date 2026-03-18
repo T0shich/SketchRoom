@@ -1,19 +1,14 @@
-import { PrismaPg } from '@prisma/adapter-pg'
 import cors from 'cors'
 import 'dotenv/config'
 import express from 'express'
 import { createServer } from 'http'
-import { PrismaClient } from './generated/prisma'
 import { RoomRoutes } from './routes/RoomRoutes'
 import { initSockets } from './sockets'
+import { prisma } from './types/Prisma'
 const app = express()
 const PORT = process.env.PORT || 3000
 const httpServer = createServer(app)
 
-const adapter = new PrismaPg({
-	connectionString: process.env.DATABASE_URL,
-})
-const prisma = new PrismaClient({ adapter })
 
 app.use(cors())
 app.use(express.json())
@@ -25,6 +20,12 @@ initSockets(httpServer)
 app.get('/users', async (req, res) => {
 	const users = await prisma.user.findMany()
 	res.json(users)
+})
+
+prisma.$connect().then(() => {
+	console.log('Подключение к базе данных успешно')
+}).catch((err) => {
+	console.error('Ошибка подключения к базе данных:', err)
 })
 
 httpServer.listen(PORT, () => {
