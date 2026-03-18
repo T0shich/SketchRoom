@@ -1,7 +1,8 @@
 import axios from 'axios'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { saveAuthToken } from '../store/auth'
 import AuthButton from '../ui/AuthButton'
 import AuthInput from '../ui/AuthInput'
 import { Layout } from './Layout'
@@ -9,6 +10,7 @@ import { Layout } from './Layout'
 const API_URL = import.meta.env.API_URL || 'http://localhost:3000'
 
 const LoginForm = () => {
+	const navigate = useNavigate()
 	const [userData, setUserData] = useState({
 		email: '',
 		password: ''
@@ -22,11 +24,19 @@ const LoginForm = () => {
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
 		try {
-			await axios.post(`${API_URL}/auth/login`, {
+			const response = await axios.post(`${API_URL}/auth/login`, {
 				email: userData.email,
 				password: userData.password,
 			})
-			alert('Пользователь успешно вошел в систему!')
+
+			const token = response.data?.token
+			if (!token) {
+				alert('Токен не получен от сервера')
+				return
+			}
+
+			saveAuthToken(token)
+			navigate('/', { replace: true })
 		} catch (error) {
 			console.error('Ошибка при входе:', error)
 			if (axios.isAxiosError(error)) {

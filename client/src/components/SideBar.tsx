@@ -5,6 +5,7 @@ import { Socket } from 'socket.io-client'
 interface SideBarProps {
 	roomKey: string | null
 	socket: Socket
+	currentUserEmail: string
 }
 
 interface User {
@@ -18,7 +19,7 @@ interface RoomUsersUpdatedPayload {
 	users: User[]
 }
 
-const SideBar = ({ roomKey, socket }: SideBarProps) => {
+const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
 	const [data, setData] = useState<RoomUsersUpdatedPayload | null>(null)
 
 	useEffect(() => {
@@ -76,6 +77,9 @@ const SideBar = ({ roomKey, socket }: SideBarProps) => {
 					))}
 				</div>
 			)}
+			<div className='mt-auto w-full rounded-lg bg-slate-100 px-2 py-2 text-[10px] text-slate-600'>
+				{currentUserEmail}
+			</div>
 		</aside>
 	)
 }

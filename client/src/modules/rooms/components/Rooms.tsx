@@ -1,16 +1,22 @@
 import axios, { AxiosError } from 'axios'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface RoomsProps {
 	onJoinRoom: (key: string) => void
+	initialMode?: 'create' | 'join'
 }
 
-export const Rooms = ({ onJoinRoom }: RoomsProps) => {
-	const [mode, setMode] = useState<'create' | 'join'>('create')
+export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
+	const [mode, setMode] = useState<'create' | 'join'>(initialMode)
 	const [roomKey, setRoomKey] = useState<string>('')
 	const [inputKey, setInputKey] = useState<string>('')
 	const [error, setError] = useState<string>('')
 	const [isLoading, setIsLoading] = useState(false)
+
+	useEffect(() => {
+		setMode(initialMode)
+		setError('')
+	}, [initialMode])
 
 	const createRoom = async () => {
 		setIsLoading(true)
