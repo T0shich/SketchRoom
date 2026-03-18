@@ -1,12 +1,16 @@
-import RegisterForm from '../components/RegisterForm'
-import LoginForm from '../components/LoginForm'
-import { useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom'
 const AuthPage = () => {
-	const location = useLocation();
-	const isLogin = location.pathname === '/login';
 	return (
-		<div>
-			{isLogin ? <LoginForm /> : <RegisterForm />}
+		<div className='flex gap-4 m-4'>
+
+			<Link className="bg-white py-3 px-6 rounded-2xl hover:bg-slate-200 shadow-md" to="/register">
+				Регистрация
+			</Link>
+
+			<Link className="bg-white py-3 px-6 rounded-2xl hover:bg-slate-200 shadow-md" to="/login">
+				Войти
+			</Link>
+
 		</div>
 	)
 }
