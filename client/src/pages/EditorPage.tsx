@@ -66,7 +66,7 @@ const EditorPage = () => {
 				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
 					<div className='mb-1 text-sm text-slate-500'>SketchRoom</div>
 					<h1 className='mb-4 text-2xl font-semibold text-slate-900'>Совместная доска</h1>
-					<div className='mb-6 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
+					<div className='mb-6 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-sРегистрацияlate-500'>
 						{isConnecting ? `Подключено • ${socketId}` : 'Подключение к серверу...'}
 					</div>
 					<Rooms onJoinRoom={handleJoinRoom} />

@@ -12,6 +12,7 @@
   "dependencies": {
     "axios": "^1.13.4",
     "canvas": "^3.2.1",
+    "dotenv": "^17.3.1",
     "fabric": "^7.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -22,7 +23,7 @@
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.1.18",
     "@types/fabric": "^5.3.11",
-    "@types/node": "^24.10.1",
+    "@types/node": "^24.12.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
