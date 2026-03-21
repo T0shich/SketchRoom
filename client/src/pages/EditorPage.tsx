@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
-import { Layout } from '../components/Layout'
 import SideBar from '../components/SideBar'
 import { DrawingCanvas } from '../modules/canvas'
 import { Rooms } from '../modules/rooms'
-import { getAuthToken, getAuthUser, isAuthenticated } from '../store/auth'
+import { getAuthToken, getAuthUser, isAuthenticated } from '../store/Auth'
+import { Layout } from '../ui/Layout'
 
 interface JoinedRoomResponse {
 	success: boolean

@@ -2,17 +2,16 @@ import axios from 'axios'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { saveAuthToken } from '../store/auth'
-import AuthButton from '../ui/AuthButton'
-import AuthInput from '../ui/AuthInput'
-import { Layout } from './Layout'
+import { saveAuthToken } from '../../store/Auth'
+import AuthButton from '../../ui/AuthButton'
+import AuthInput from '../../ui/AuthInput'
+import { Layout } from '../../ui/Layout'
 
 const API_URL = import.meta.env.API_URL || 'http://localhost:3000'
 
-const RegisterForm = () => {
+const LoginForm = () => {
 	const navigate = useNavigate()
 	const [userData, setUserData] = useState({
-		name: '',
 		email: '',
 		password: ''
 	})
@@ -25,8 +24,7 @@ const RegisterForm = () => {
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault()
 		try {
-			const response = await axios.post(`${API_URL}/auth/register`, {
-				name: userData.name,
+			const response = await axios.post(`${API_URL}/auth/login`, {
 				email: userData.email,
 				password: userData.password,
 			})
@@ -40,12 +38,12 @@ const RegisterForm = () => {
 			saveAuthToken(token)
 			navigate('/', { replace: true })
 		} catch (error) {
-			console.error('Ошибка при регистрации:', error)
+			console.error('Ошибка при входе:', error)
 			if (axios.isAxiosError(error)) {
-				alert(error.response?.data?.message || 'Ошибка при регистрации')
+				alert(error.response?.data?.message || 'Ошибка при входе')
 				return
 			}
-			alert('Ошибка при регистрации')
+			alert('Ошибка при входе')
 		}
 	}
 
@@ -53,19 +51,18 @@ const RegisterForm = () => {
 		<Layout>
 			<div className="flex items-center justify-center min-h-screen">
 				<form onSubmit={handleSubmit} className="flex flex-col h-fit w-fit rounded-2xl bg-white px-13 py-10 gap-6 shadow-lg">
-					<h2 className='text-2xl text-slate-900/80 font-bold text-center my-8'>Регистрация</h2>
+					<h2 className='text-2xl text-slate-900/80 font-bold text-center my-8'>Вход в систему</h2>
 
-					<div className="flex flex-col gap-8 min-w-80">
-						<AuthInput name='name' value={userData.name} onChange={handleChange} type='text' placeholder='Имя пользователя' />
+					<div className="flex flex-col gap-7 min-w-80">
 						<AuthInput name='email' value={userData.email} onChange={handleChange} type='email' placeholder='Email' />
 						<AuthInput name='password' value={userData.password} onChange={handleChange} type='password' placeholder='Пароль' />
 					</div>
 
-					<AuthButton type='submit' className='mt-8'>
-						Зарегистрироваться
+					<AuthButton type='submit' className='mt-6'>
+						Войти
 					</AuthButton>
 					<span className='text-center text-slate-600/70'>
-						Уже есть аккаунт? <Link to='/login' className='text-blue-500/80 hover:underline'>Войти</Link>
+						Нет аккаунта? <Link to='/register' className='text-blue-500/80 hover:underline'>Зарегистрироваться</Link>
 					</span>
 				</form>
 			</div>
@@ -74,4 +71,4 @@ const RegisterForm = () => {
 	)
 }
 
-export default RegisterForm
+export default LoginForm

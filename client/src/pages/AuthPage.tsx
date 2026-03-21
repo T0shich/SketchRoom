@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { clearAuthToken, getAuthUser, isAuthenticated } from '../store/auth'
+import { clearAuthToken, getAuthUser, isAuthenticated } from '../store/Auth'
 const AuthPage = () => {
 	const user = getAuthUser()
 	const authenticated = isAuthenticated()

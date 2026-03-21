@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import { Layout } from '../components/Layout'
-import { getAuthUser, isAuthenticated } from '../store/auth'
+import { getAuthUser, isAuthenticated } from '../store/Auth'
 import AuthButton from '../ui/AuthButton'
+import { Layout } from '../ui/Layout'
 import AuthPage from './AuthPage'
 const HomePage = () => {
 	const authenticated = isAuthenticated()
@@ -27,6 +27,11 @@ const HomePage = () => {
 								<Link to='/editor?mode=join'>
 									<AuthButton className='border-slate-700 bg-slate-700 hover:border-slate-600 hover:bg-slate-600'>
 										Присоединиться к холсту
+									</AuthButton>
+								</Link>
+								<Link to='/boards'>
+									<AuthButton className='border-slate-700 bg-slate-700 hover:border-slate-600 hover:bg-slate-600'>
+										Просмотреть доски
 									</AuthButton>
 								</Link>
 							</div>
