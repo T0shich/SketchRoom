@@ -76,7 +76,6 @@ export function BoardController() {
 			const board = await prisma.board.findFirst({
 				where: {
 					roomKey: normalizedRoomKey,
-					ownerId: userId,
 				},
 			})
 

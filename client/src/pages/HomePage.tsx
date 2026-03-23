@@ -79,7 +79,9 @@ const HomePage = () => {
 				setRoomKey(response.data.key)
 				handleJoinRoom(response.data.key)
 			}
-			navigate(`/editor?boardId=${response.data.boardId}`)
+			const boardId = await BoardAPI.getBoardByRoomKey(response.data.key)
+			console.log(boardId);
+			navigate(`/editor?boardId=${boardId.id}`)
 
 		} catch (err) {
 			const axiosError = err as AxiosError
