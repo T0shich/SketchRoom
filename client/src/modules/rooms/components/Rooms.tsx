@@ -1,17 +1,24 @@
 import axios, { AxiosError } from 'axios'
 import { useEffect, useState } from 'react'
+import { BoardAPI } from '../../../store/BoardAPI'
+import { useNavigate } from 'react-router-dom'
 
 interface RoomsProps {
 	onJoinRoom: (key: string) => void
 	initialMode?: 'create' | 'join'
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
+	const navigate = useNavigate()
+
 	const [mode, setMode] = useState<'create' | 'join'>(initialMode)
 	const [roomKey, setRoomKey] = useState<string>('')
 	const [inputKey, setInputKey] = useState<string>('')
 	const [error, setError] = useState<string>('')
 	const [isLoading, setIsLoading] = useState(false)
+	const [isCreating, setIsCreating] = useState(false)
 
 	useEffect(() => {
 		setMode(initialMode)
@@ -21,15 +28,27 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 	const createRoom = async () => {
 		setIsLoading(true)
 		setError('')
+		const titleInput = window.prompt('Название доски', 'Новая доска')
+		if (titleInput === null) return
+
+		const title = titleInput.trim() || 'Новая доска'
+		setIsCreating(true)
+		setError('')
+
 		try {
-			const response = await axios.post('http://localhost:3000/rooms')
-			const { key } = response.data
-			setRoomKey(key)
-			onJoinRoom(key)
+			const roomResponse = await axios.post(`${API_URL}/rooms`)
+			const roomKey = roomResponse.data?.key
+
+			if (typeof roomKey !== 'string' || !roomKey) {
+				throw new Error('Некорректный room key')
+			}
+
+			const board = await BoardAPI.createBoard(title, roomKey)
+			navigate(`/editor?boardId=${board.id}`)
 		} catch {
-			setError('Не удалось создать комнату')
+			setError('Не удалось создать доску')
 		} finally {
-			setIsLoading(false)
+			setIsCreating(false)
 		}
 	}
 
