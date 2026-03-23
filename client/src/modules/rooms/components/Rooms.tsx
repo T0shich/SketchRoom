@@ -1,18 +1,25 @@
 import axios, { AxiosError } from 'axios'
 import { useEffect, useState } from 'react'
+import { BoardAPI } from '../../../store/BoardAPI'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 interface RoomsProps {
 	onJoinRoom: (key: string) => void
 	initialMode?: 'create' | 'join'
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
 export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
+	const navigate = useNavigate()
 	const [mode, setMode] = useState<'create' | 'join'>(initialMode)
 	const [roomKey, setRoomKey] = useState<string>('')
 	const [inputKey, setInputKey] = useState<string>('')
+	const [inputName, setInputName] = useState<string>('')
 	const [error, setError] = useState<string>('')
 	const [isLoading, setIsLoading] = useState(false)
-
+	const [isCreating, setIsCreating] = useState(false)
+ 
 	useEffect(() => {
 		setMode(initialMode)
 		setError('')
@@ -21,15 +28,26 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 	const createRoom = async () => {
 		setIsLoading(true)
 		setError('')
+		
+
+		const title = inputName.trim() || 'Новая доска'
+		setIsCreating(true)
+		setError('')
+
 		try {
-			const response = await axios.post('http://localhost:3000/rooms')
-			const { key } = response.data
-			setRoomKey(key)
-			onJoinRoom(key)
+			const roomResponse = await axios.post(`${API_URL}/rooms`)
+			const roomKey = roomResponse.data?.key
+
+			if (typeof roomKey !== 'string' || !roomKey) {
+				throw new Error('Некорректный room key')
+			}
+
+			const board = await BoardAPI.createBoard(title, roomKey)
+			navigate(`/editor?boardId=${board.id}`)
 		} catch {
-			setError('Не удалось создать комнату')
+			setError('Не удалось создать доску')
 		} finally {
-			setIsLoading(false)
+			setIsCreating(false)
 		}
 	}
 
@@ -57,7 +75,7 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 
 	return (
 		<div className='space-y-4'>
-			<div className='grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1'>
+			{/* <div className='grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1'>
 				<button
 					onClick={() => {
 						setMode('create')
@@ -76,16 +94,25 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 				>
 					Войти
 				</button>
-			</div>
+			</div> */}
 
 			{mode === 'create' ? (
-				<button
-					onClick={createRoom}
-					disabled={isLoading}
-					className='w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
-				>
-					{isLoading ? 'Создание...' : 'Создать комнату'}
-				</button>
+				<div className='space-y-3'>
+					<input
+						type='text'
+						placeholder='Имя комнаты'
+						value={inputName}
+						onChange={e => setInputName(e.target.value.toUpperCase())}
+						className='w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-300 focus:ring-2 focus:ring-slate-200'
+					/>
+					<button
+						onClick={createRoom}
+						disabled={isLoading}
+						className='w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+					>
+						{isLoading ? 'Создание...' : 'Создать комнату'}
+					</button>
+				</div>
 			) : (
 				<div className='space-y-3'>
 					<input
