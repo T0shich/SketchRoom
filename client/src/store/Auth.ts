@@ -1,3 +1,4 @@
+//ЗАМЕНИТЬ 
 export const AUTH_TOKEN_KEY = 'sketchroom_token'
 
 export interface AuthUser {

@@ -2,6 +2,7 @@ import type { TPointerEventInfo } from 'fabric'
 import { Canvas, FabricImage, FabricObject, PencilBrush, util } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
+import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useFabric } from '../../../store/useFabric'
 import { usePasteImage } from '../hooks/usePasteImage'
 import { Toolbar } from './Toolbar'
@@ -11,6 +12,7 @@ import { Zoom } from './Zoom'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
+	initialSnapshot?: CanvasSnapshot | null
 }
 
 type SocketObjectData = Record<string, unknown> & { socketObjectId?: string }
@@ -59,10 +61,11 @@ const isIntersecting = (first: FabricObject, second: FabricObject) => {
 	)
 }
 
-export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
+export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: DrawingCanvasProps) => {
 	const wrapperRef = useRef<HTMLDivElement>(null)
 	const canvasHostRef = useRef<HTMLDivElement>(null)
 	const fabricCanvasRef = useRef<Canvas | null>(null)
+	const snapshotLoadedRef = useRef(false)
 	const { setFabricRef } = useFabric()
 
 	const [brushColor, setBrushColor] = useState(INITIAL_BRUSH_COLOR)
@@ -73,6 +76,10 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 	const [eraserPos, setEraserPos] = useState<{ x: number; y: number } | null>(null)
 
 	usePasteImage({ socket, roomKey })
+
+	useEffect(() => {
+		snapshotLoadedRef.current = false
+	}, [roomKey])
 
 
 	useEffect(() => {
@@ -146,6 +153,33 @@ export const DrawingCanvas = ({ socket, roomKey }: DrawingCanvasProps) => {
 			setFabricRef({ current: null })
 		}
 	}, [setFabricRef])
+
+	useEffect(() => {
+		const canvas = fabricCanvasRef.current
+		if (!canvas || !initialSnapshot || snapshotLoadedRef.current) return
+
+		snapshotLoadedRef.current = true
+
+		void canvas.loadFromJSON(initialSnapshot).then(() => {
+			if (
+				typeof initialSnapshot.scaleX === 'number' &&
+				typeof initialSnapshot.scaleY === 'number' &&
+				typeof initialSnapshot.left === 'number' &&
+				typeof initialSnapshot.top === 'number'
+			) {
+				canvas.setViewportTransform([
+					initialSnapshot.scaleX,
+					0,
+					0,
+					initialSnapshot.scaleY,
+					initialSnapshot.left,
+					initialSnapshot.top,
+				])
+			}
+
+			canvas.renderAll()
+		})
+	}, [initialSnapshot, roomKey])
 
 	// курсор ластика
 	useEffect(() => {

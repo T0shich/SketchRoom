@@ -21,7 +21,7 @@ interface Board {
 	id: string
 	title: string
 	roomKey: string
-	snapshotId?: CanvasSnapshot | null
+	snapshot?: CanvasSnapshot | null
 	createdAt: string
 	updatedAt: string
 }
@@ -48,10 +48,10 @@ export const BoardAPI = {
 		return res.data.board
 	},
 
-	createBoard: async (title: string): Promise<Board> => {
+	createBoard: async (title: string, roomKey: string): Promise<Board> => {
 		const res = await axios.post(
 			`${API_URL}/boards`,
-			{ title },
+			{ title, roomKey },
 			{ headers: getHeaders() },
 		)
 		return res.data.board
@@ -72,3 +72,5 @@ export const BoardAPI = {
 		await axios.delete(`${API_URL}/boards/${id}`, { headers: getHeaders() })
 	},
 }
+
+export type { Board, CanvasSnapshot }
