@@ -189,7 +189,7 @@ const EditorPage = () => {
 					<div className='mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
 						Аккаунт: {user.email}
 					</div>
-					<div className='mb-6 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
+					<div className='mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
 						{isConnecting ? `Подключено • ${socketId}` : 'Подключение к серверу...'}
 					</div>
 					<Rooms onJoinRoom={handleJoinRoom} initialMode={initialMode} />

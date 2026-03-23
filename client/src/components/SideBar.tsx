@@ -77,8 +77,8 @@ const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
 					))}
 				</div>
 			)}
-			<div className='mt-auto w-full rounded-lg bg-slate-100 px-2 py-2 text-[10px] text-slate-600'>
-				{currentUserEmail}
+			<div className='mt-auto list-none bg-slate-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 transition-colors'>
+				{currentUserEmail[0]}
 			</div>
 		</aside>
 	)
