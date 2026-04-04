@@ -1,5 +1,5 @@
 import type { TPointerEventInfo } from 'fabric'
-import { Canvas, FabricImage, FabricObject, IText, PencilBrush, util } from 'fabric'
+import { Canvas, FabricImage, FabricObject, PencilBrush, util } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
@@ -8,7 +8,8 @@ import { usePasteImage } from '../hooks/usePasteImage'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
-
+import { TextMode } from '../Tools/TextMode'
+import { DrawingModes } from '../Tools/DrawingModes'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
@@ -22,8 +23,10 @@ const INITIAL_BRUSH_SIZE = 3
 const SOCKET_OBJECT_ID = 'socketObjectId'
 const INITIAL_ERASER_SIZE = 20
 
+// Генерирует уникальный идентификатор объекта для синхронизации через сокет.
 const createSocketObjectId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
+// Возвращает socketObjectId из Fabric-объекта или сериализованных данных.
 const getSocketObjectId = (object: FabricObject | SocketObjectData | null | undefined) => {
 	if (!object) return undefined
 	if (object instanceof FabricObject) {
@@ -35,6 +38,7 @@ const getSocketObjectId = (object: FabricObject | SocketObjectData | null | unde
 	return typeof value === 'string' ? value : undefined
 }
 
+// Гарантирует наличие socketObjectId у объекта и возвращает его.
 const ensureSocketObjectId = (object: FabricObject) => {
 	let objectId = getSocketObjectId(object)
 	if (!objectId) {
@@ -44,11 +48,13 @@ const ensureSocketObjectId = (object: FabricObject) => {
 	return objectId
 }
 
+// Сериализует объект для передачи по сокету с нужными дополнительными полями.
 const serializeObject = (object: FabricObject) => {
 	ensureSocketObjectId(object)
 	return object.toObject([SOCKET_OBJECT_ID, 'globalCompositeOperation']) as SocketObjectData
 }
 
+// Проверяет пересечение двух объектов по их bounding box.
 const isIntersecting = (first: FabricObject, second: FabricObject) => {
 	const firstRect = first.getBoundingRect()
 	const secondRect = second.getBoundingRect()
@@ -78,94 +84,19 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 
 	usePasteImage({ socket, roomKey })
 
+	// Сбрасывает флаг загрузки снапшота при смене комнаты.
 	useEffect(() => {
 		snapshotLoadedRef.current = false
 	}, [roomKey])
 
-	useEffect(() => {
-		const canvas = fabricCanvasRef.current
-		if (!textMode || !canvas) return
+	// В текстовом режиме добавляет/редактирует IText по клику на холст.
+	TextMode({ textMode, setTextMode, canvasRef: fabricCanvasRef, brushColor })
 
-		const onMouseDown = (opt: TPointerEventInfo) => {
-			const target = opt.target
-			if (target instanceof IText) {
-				canvas.setActiveObject(target)
-				target.enterEditing()
-				target.selectAll()
-				canvas.renderAll()
-				setTextMode(false)
-				return
-			}
+	// Переключает параметры холста и кисти для режимов рисования, ластика и текста.
+	DrawingModes({ brushColor, brushSize, eraserSize, isEraser, isDrawingMode, textMode, fabricCanvasRef })
+	
 
-			if (target) return
-
-			const point = canvas.getScenePoint(opt.e)
-			const interactiveText = new IText('', {
-				left: point.x,
-				top: point.y,
-				fontFamily: 'Helvetica',
-				fontWeight: 'bold',
-				fill: brushColor,
-				fontSize: 32,
-			})
-
-			canvas.add(interactiveText)
-			canvas.setActiveObject(interactiveText)
-			interactiveText.enterEditing()
-			interactiveText.selectAll()
-			canvas.renderAll()
-
-			if (socket) {
-				socket.emit('object:added', { roomKey, object: serializeObject(interactiveText) })
-			}
-
-			setTextMode(false)
-		}
-
-		canvas.on('mouse:down', onMouseDown)
-		return () => {
-			canvas.off('mouse:down', onMouseDown)
-		}
-	}, [textMode, brushColor, roomKey, socket])
-
-
-	useEffect(() => {
-		const canvas = fabricCanvasRef.current
-		if (!canvas?.freeDrawingBrush) return
-		const brush = canvas.freeDrawingBrush as PencilBrush
-
-		if (isEraser) {
-			canvas.set({
-				isDrawingMode: true,
-				selection: false,
-				defaultCursor: 'none',
-				hoverCursor: 'none',
-			})
-			brush.color = '#000000'
-			brush.width = eraserSize
-			return
-		}
-
-		if (textMode) {
-			canvas.set({
-				isDrawingMode: false,
-				selection: false,
-				defaultCursor: 'text',
-				hoverCursor: 'text',
-			})
-			return
-		}
-
-		canvas.set({
-			isDrawingMode,
-			selection: true,
-			defaultCursor: 'default',
-			hoverCursor: 'move',
-		})
-		brush.color = brushColor
-		brush.width = brushSize
-	}, [brushColor, brushSize, eraserSize, isDrawingMode, isEraser, textMode])
-
+	// Инициализирует Fabric canvas, базовую кисть и обработчик ресайза окна.
 	useEffect(() => {
 		if (!canvasHostRef.current || !wrapperRef.current) return
 
@@ -191,6 +122,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		const tempRef = { current: canvas } as React.RefObject<Canvas | null>
 		setFabricRef(tempRef)
 
+		// Актуализирует размеры канваса под размер контейнера.
 		const handleResize = () => {
 			if (!canvasHostRef.current) return
 			canvas.setDimensions({
@@ -211,6 +143,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		}
 	}, [setFabricRef])
 
+	// Загружает начальный снимок холста и восстанавливает viewport один раз на комнату.
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current
 		if (!canvas || !initialSnapshot || snapshotLoadedRef.current) return
@@ -238,11 +171,13 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		})
 	}, [initialSnapshot, roomKey])
 
+	// Отрисовывает визуальный курсор ластика и обновляет его позицию по движению мыши.
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current
 		if (!canvas) return
 		if (!isEraser) return
 
+		// Обновляет координаты курсора ластика относительно canvas.
 		const onMouseMove = (opt: TPointerEventInfo) => {
 			const canvasEl = canvas.upperCanvasEl ?? canvas.lowerCanvasEl
 			if (!canvasEl) return
@@ -255,6 +190,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			})
 		}
 
+		// Прячет курсор ластика при уходе мыши за пределы canvas.
 		const onMouseLeave = () => { setEraserPos(null) }
 
 		canvas.on('mouse:move', onMouseMove)
@@ -267,9 +203,11 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		}
 	}, [isEraser])
 
+	// Подписывается на сокет-события добавления/изменения/очистки объектов от других участников.
 	useEffect(() => {
 		if (!socket || !fabricCanvasRef.current) return
 
+		// Добавляет полученный по сокету объект, если его ещё нет на канвасе.
 		const handleAdded = (data: { object: SocketObjectData }) => {
 			if (!data?.object) return
 
@@ -294,6 +232,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			})
 		}
 
+		// Обновляет существующий объект по socketObjectId или добавляет, если он отсутствует.
 		const handleModified = (data: { object: SocketObjectData }) => {
 			if (!data?.object) return
 
@@ -326,6 +265,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			})
 		}
 
+		// Очищает холст по событию очистки от других участников.
 		const handleClear = () => {
 			const canvas = fabricCanvasRef.current
 			if (!canvas) return
@@ -333,21 +273,6 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			canvas.getObjects().forEach(obj => canvas.remove(obj))
 			canvas.renderAll()
 		}
-
-		socket.on('object:added_s', handleAdded)
-		socket.on('object:modified_s', handleModified)
-		socket.on('canvas:clear_s', handleClear)
-
-		return () => {
-			socket.off('object:added_s', handleAdded)
-			socket.off('object:modified_s', handleModified)
-			socket.off('canvas:clear_s', handleClear)
-		}
-	}, [socket])
-
-	// обработка удалений от других участников
-	useEffect(() => {
-		if (!socket || !fabricCanvasRef.current) return
 
 		const handleRemoved = (data: { objectId: string }) => {
 			const canvas = fabricCanvasRef.current
@@ -358,14 +283,26 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			canvas.renderAll()
 		}
 
+		socket.on('object:added_s', handleAdded)
+		socket.on('object:modified_s', handleModified)
+		socket.on('canvas:clear_s', handleClear)
 		socket.on('object:removed_s', handleRemoved)
-		return () => { socket.off('object:removed_s', handleRemoved) }
+
+		return () => {
+			socket.off('object:removed_s', handleRemoved)
+			socket.off('object:added_s', handleAdded)
+			socket.off('object:modified_s', handleModified)
+			socket.off('canvas:clear_s', handleClear)
+		}
 	}, [socket])
 
+
+	// Отправляет локальные изменения рисования/перемещения в сокет и обрабатывает ластик как вырезание.
 	useEffect(() => {
 		if (!fabricCanvasRef.current || !socket) return
 		const canvas = fabricCanvasRef.current
 
+		// Применяет путь ластика к объекту и заменяет его на результирующее изображение.
 		const bakeEraserIntoObject = async (target: FabricObject, eraserPath: FabricObject) => {
 			const targetId = ensureSocketObjectId(target)
 			const targetBounds = target.getBoundingRect()
@@ -411,6 +348,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			})
 		}
 
+		// Обрабатывает завершение рисования пути: обычный штрих или стирание.
 		const onPathCreated = (e: { path: FabricObject }) => {
 			if (isEraser) {
 				e.path.set({
@@ -439,6 +377,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			socket.emit('object:added', { roomKey, object: serializeObject(e.path) })
 		}
 
+		// Отправляет изменения объекта после перемещения/трансформации.
 		const onObjectModified = (e: { target: FabricObject }) => {
 			const target = e.target
 			if (!target) return
