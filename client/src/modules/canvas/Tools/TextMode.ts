@@ -15,7 +15,7 @@ interface TextModeProps {
 	onTextCreated?: (text: FabricObject) => void
 }
 
-export const TextMode = ({
+export const useTextMode = ({
 	textMode,
 	setTextMode,
 	canvasRef,
@@ -64,6 +64,4 @@ export const TextMode = ({
 			canvas.off('mouse:down', onMouseDown)
 		}
 	}, [textMode, setTextMode, canvasRef, brushColor, onTextCreated])
-
-	return null
 }

@@ -11,7 +11,7 @@ interface DrawingModesProps {
 	fabricCanvasRef: RefObject<Canvas | null>
 }
 
-export const DrawingModes = ({
+export const useDrawingModes = ({
 	brushColor,
 	brushSize,
 	eraserSize,
@@ -64,6 +64,4 @@ export const DrawingModes = ({
 		textMode,
 		fabricCanvasRef,
 	])
-
-	return null
 }

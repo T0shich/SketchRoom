@@ -1,22 +1,24 @@
 import type { TPointerEventInfo } from 'fabric'
-import { Canvas, FabricImage, FabricObject, PencilBrush, util } from 'fabric'
+import { Canvas, FabricImage, FabricObject, PencilBrush } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useFabric } from '../../../store/useFabric'
 import { usePasteImage } from '../hooks/usePasteImage'
+import { ensureSocketObjectId, isIntersecting, serializeObject } from '../Socket/FabrickObjects'
+import { useSocketEvents } from '../Socket/SocketEvents'
+import { useDrawingModes } from '../Tools/DrawingModes'
+import { useTextMode } from '../Tools/TextMode'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
-import { TextMode } from '../Tools/TextMode'
-import { DrawingModes } from '../Tools/DrawingModes'
 interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
 	initialSnapshot?: CanvasSnapshot | null
 }
 
-type SocketObjectData = Record<string, unknown> & { socketObjectId?: string }
+
 
 const INITIAL_BRUSH_COLOR = '#111827'
 const INITIAL_BRUSH_SIZE = 3
@@ -24,48 +26,7 @@ const SOCKET_OBJECT_ID = 'socketObjectId'
 const INITIAL_ERASER_SIZE = 20
 
 // Генерирует уникальный идентификатор объекта для синхронизации через сокет.
-const createSocketObjectId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 
-// Возвращает socketObjectId из Fabric-объекта или сериализованных данных.
-const getSocketObjectId = (object: FabricObject | SocketObjectData | null | undefined) => {
-	if (!object) return undefined
-	if (object instanceof FabricObject) {
-		const value = object.get(SOCKET_OBJECT_ID)
-		return typeof value === 'string' ? value : undefined
-	}
-
-	const value = object[SOCKET_OBJECT_ID]
-	return typeof value === 'string' ? value : undefined
-}
-
-// Гарантирует наличие socketObjectId у объекта и возвращает его.
-const ensureSocketObjectId = (object: FabricObject) => {
-	let objectId = getSocketObjectId(object)
-	if (!objectId) {
-		objectId = createSocketObjectId()
-		object.set(SOCKET_OBJECT_ID, objectId)
-	}
-	return objectId
-}
-
-// Сериализует объект для передачи по сокету с нужными дополнительными полями.
-const serializeObject = (object: FabricObject) => {
-	ensureSocketObjectId(object)
-	return object.toObject([SOCKET_OBJECT_ID, 'globalCompositeOperation']) as SocketObjectData
-}
-
-// Проверяет пересечение двух объектов по их bounding box.
-const isIntersecting = (first: FabricObject, second: FabricObject) => {
-	const firstRect = first.getBoundingRect()
-	const secondRect = second.getBoundingRect()
-
-	return !(
-		firstRect.left + firstRect.width < secondRect.left ||
-		secondRect.left + secondRect.width < firstRect.left ||
-		firstRect.top + firstRect.height < secondRect.top ||
-		secondRect.top + secondRect.height < firstRect.top
-	)
-}
 
 export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: DrawingCanvasProps) => {
 	const wrapperRef = useRef<HTMLDivElement>(null)
@@ -90,11 +51,30 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 	}, [roomKey])
 
 	// В текстовом режиме добавляет/редактирует IText по клику на холст.
-	TextMode({ textMode, setTextMode, canvasRef: fabricCanvasRef, brushColor })
+	useTextMode({
+		textMode,
+		setTextMode,
+		canvasRef: fabricCanvasRef,
+		brushColor,
+		onTextCreated: textObject => {
+			if (socket) {
+				socket.emit('object:added', { roomKey, object: serializeObject(textObject) })
+			}
+		},
+	})
 
-	// Переключает параметры холста и кисти для режимов рисования, ластика и текста.
-	DrawingModes({ brushColor, brushSize, eraserSize, isEraser, isDrawingMode, textMode, fabricCanvasRef })
-	
+	useDrawingModes({
+		brushColor,
+		brushSize,
+		eraserSize,
+		isEraser,
+		isDrawingMode,
+		textMode,
+		fabricCanvasRef,
+	})
+
+	useSocketEvents({ fabricCanvasRef, socket })
+
 
 	// Инициализирует Fabric canvas, базовую кисть и обработчик ресайза окна.
 	useEffect(() => {
@@ -204,97 +184,6 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 	}, [isEraser])
 
 	// Подписывается на сокет-события добавления/изменения/очистки объектов от других участников.
-	useEffect(() => {
-		if (!socket || !fabricCanvasRef.current) return
-
-		// Добавляет полученный по сокету объект, если его ещё нет на канвасе.
-		const handleAdded = (data: { object: SocketObjectData }) => {
-			if (!data?.object) return
-
-			util.enlivenObjects([data.object]).then(objects => {
-				const canvas = fabricCanvasRef.current
-				if (!canvas) return
-
-				objects.forEach(obj => {
-					if (!(obj instanceof FabricObject)) return
-
-					const incomingId = getSocketObjectId(obj) || ensureSocketObjectId(obj)
-					if (incomingId) {
-						const existing = canvas
-							.getObjects()
-							.find(existingObj => getSocketObjectId(existingObj) === incomingId)
-						if (existing) return
-					}
-
-					canvas.add(obj)
-				})
-				canvas.renderAll()
-			})
-		}
-
-		// Обновляет существующий объект по socketObjectId или добавляет, если он отсутствует.
-		const handleModified = (data: { object: SocketObjectData }) => {
-			if (!data?.object) return
-
-			util.enlivenObjects([data.object]).then(objects => {
-				const canvas = fabricCanvasRef.current
-				if (!canvas) return
-
-				objects.forEach(obj => {
-					if (!(obj instanceof FabricObject)) return
-
-					const incomingId = getSocketObjectId(obj)
-					if (!incomingId) {
-						return
-					}
-
-					const currentObjects = canvas.getObjects()
-					const existingIndex = currentObjects.findIndex(
-						existingObj => getSocketObjectId(existingObj) === incomingId,
-					)
-
-					if (existingIndex === -1) {
-						canvas.add(obj)
-						return
-					}
-
-					canvas.remove(currentObjects[existingIndex])
-					canvas.insertAt(existingIndex, obj)
-				})
-				canvas.renderAll()
-			})
-		}
-
-		// Очищает холст по событию очистки от других участников.
-		const handleClear = () => {
-			const canvas = fabricCanvasRef.current
-			if (!canvas) return
-
-			canvas.getObjects().forEach(obj => canvas.remove(obj))
-			canvas.renderAll()
-		}
-
-		const handleRemoved = (data: { objectId: string }) => {
-			const canvas = fabricCanvasRef.current
-			if (!canvas) return
-			const obj = canvas.getObjects().find(o => getSocketObjectId(o) === data.objectId)
-			if (!obj) return
-			canvas.remove(obj)
-			canvas.renderAll()
-		}
-
-		socket.on('object:added_s', handleAdded)
-		socket.on('object:modified_s', handleModified)
-		socket.on('canvas:clear_s', handleClear)
-		socket.on('object:removed_s', handleRemoved)
-
-		return () => {
-			socket.off('object:removed_s', handleRemoved)
-			socket.off('object:added_s', handleAdded)
-			socket.off('object:modified_s', handleModified)
-			socket.off('canvas:clear_s', handleClear)
-		}
-	}, [socket])
 
 
 	// Отправляет локальные изменения рисования/перемещения в сокет и обрабатывает ластик как вырезание.
