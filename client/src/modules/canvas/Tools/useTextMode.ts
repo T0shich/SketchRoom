@@ -26,25 +26,10 @@ export const useTextMode = ({
 		const canvas = canvasRef.current
 		if (!textMode || !canvas) return
 
-		const registerCommit = (textObject: IText) => {
-			textObject.once('editing:exited', () => {
-				if (!canvasRef.current) return
-
-				if (!textObject.text?.trim()) {
-					canvasRef.current.remove(textObject)
-					canvasRef.current.renderAll()
-					return
-				}
-
-				onTextCommitted?.(textObject)
-			})
-		}
-
 		const onMouseDown = (opt: TPointerEventInfo) => {
 			const target = opt.target
 			if (target instanceof IText) {
 				canvas.setActiveObject(target)
-				registerCommit(target)
 				target.enterEditing()
 				target.selectAll()
 				canvas.renderAll()
@@ -66,16 +51,30 @@ export const useTextMode = ({
 
 			canvas.add(interactiveText)
 			canvas.setActiveObject(interactiveText)
-			registerCommit(interactiveText)
 			interactiveText.enterEditing()
 			interactiveText.selectAll()
 			canvas.renderAll()
 			setTextMode(false)
 		}
 
+		const onTextEditingExited = (opt: { target: FabricObject }) => {
+			const target = opt.target
+			if (!(target instanceof IText)) return
+
+			if (target.text && target.text.trim().length > 0) {
+				onTextCommitted?.(target)
+			} else {
+				canvas.remove(target)
+				canvas.renderAll()
+			}
+		}
+
 		canvas.on('mouse:down', onMouseDown)
+		canvas.on('text:editing:exited', onTextEditingExited)
+
 		return () => {
 			canvas.off('mouse:down', onMouseDown)
+			canvas.off('text:editing:exited', onTextEditingExited)
 		}
 	}, [textMode, setTextMode, canvasRef, brushColor, onTextCommitted])
 }

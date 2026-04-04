@@ -97,7 +97,6 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		}
 	}, [setFabricRef])
 
-	// В текстовом режиме добавляет/редактирует IText по клику на холст.
 	useTextMode({
 		textMode,
 		setTextMode,
@@ -105,7 +104,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		brushColor,
 		onTextCommitted: textObject => {
 			if (socket) {
-				socket.emit('object:modified', {
+				socket.emit('object:added', {
 					roomKey,
 					object: serializeObject(textObject),
 				})

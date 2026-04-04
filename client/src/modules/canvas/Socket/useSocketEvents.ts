@@ -16,7 +16,6 @@ export const useSocketEvents = ({
 	useEffect(() => {
 		if (!socket || !fabricCanvasRef.current) return
 
-		// Добавляет полученный по сокету объект, если его ещё нет на канвасе.
 		const handleAdded = (data: { object: SocketObjectData }) => {
 			if (!data?.object) return
 
