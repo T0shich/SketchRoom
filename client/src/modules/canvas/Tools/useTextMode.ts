@@ -12,7 +12,7 @@ interface TextModeProps {
 	setTextMode: (textMode: boolean) => void
 	canvasRef: RefObject<Canvas | null>
 	brushColor: string
-	onTextCreated?: (text: FabricObject) => void
+	onTextCommitted?: (text: FabricObject) => void
 }
 
 export const useTextMode = ({
@@ -20,16 +20,31 @@ export const useTextMode = ({
 	setTextMode,
 	canvasRef,
 	brushColor,
-	onTextCreated,
+	onTextCommitted,
 }: TextModeProps) => {
 	useEffect(() => {
 		const canvas = canvasRef.current
 		if (!textMode || !canvas) return
 
+		const registerCommit = (textObject: IText) => {
+			textObject.once('editing:exited', () => {
+				if (!canvasRef.current) return
+
+				if (!textObject.text?.trim()) {
+					canvasRef.current.remove(textObject)
+					canvasRef.current.renderAll()
+					return
+				}
+
+				onTextCommitted?.(textObject)
+			})
+		}
+
 		const onMouseDown = (opt: TPointerEventInfo) => {
 			const target = opt.target
 			if (target instanceof IText) {
 				canvas.setActiveObject(target)
+				registerCommit(target)
 				target.enterEditing()
 				target.selectAll()
 				canvas.renderAll()
@@ -51,11 +66,10 @@ export const useTextMode = ({
 
 			canvas.add(interactiveText)
 			canvas.setActiveObject(interactiveText)
+			registerCommit(interactiveText)
 			interactiveText.enterEditing()
 			interactiveText.selectAll()
 			canvas.renderAll()
-
-			onTextCreated?.(interactiveText)
 			setTextMode(false)
 		}
 
@@ -63,5 +77,5 @@ export const useTextMode = ({
 		return () => {
 			canvas.off('mouse:down', onMouseDown)
 		}
-	}, [textMode, setTextMode, canvasRef, brushColor, onTextCreated])
+	}, [textMode, setTextMode, canvasRef, brushColor, onTextCommitted])
 }

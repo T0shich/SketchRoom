@@ -6,9 +6,9 @@ import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useFabric } from '../../../store/useFabric'
 import { usePasteImage } from '../hooks/usePasteImage'
 import { ensureSocketObjectId, isIntersecting, serializeObject } from '../Socket/FabrickObjects'
-import { useSocketEvents } from '../Socket/SocketEvents'
-import { useDrawingModes } from '../Tools/DrawingModes'
-import { useTextMode } from '../Tools/TextMode'
+import { useSocketEvents } from '../Socket/useSocketEvents'
+import { useDrawingModes } from '../Tools/useDrawingModes'
+import { useTextMode } from '../Tools/useTextMode'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
@@ -49,32 +49,6 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 	useEffect(() => {
 		snapshotLoadedRef.current = false
 	}, [roomKey])
-
-	// В текстовом режиме добавляет/редактирует IText по клику на холст.
-	useTextMode({
-		textMode,
-		setTextMode,
-		canvasRef: fabricCanvasRef,
-		brushColor,
-		onTextCreated: textObject => {
-			if (socket) {
-				socket.emit('object:added', { roomKey, object: serializeObject(textObject) })
-			}
-		},
-	})
-
-	useDrawingModes({
-		brushColor,
-		brushSize,
-		eraserSize,
-		isEraser,
-		isDrawingMode,
-		textMode,
-		fabricCanvasRef,
-	})
-
-	useSocketEvents({ fabricCanvasRef, socket })
-
 
 	// Инициализирует Fabric canvas, базовую кисть и обработчик ресайза окна.
 	useEffect(() => {
@@ -122,6 +96,34 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			setFabricRef({ current: null })
 		}
 	}, [setFabricRef])
+
+	// В текстовом режиме добавляет/редактирует IText по клику на холст.
+	useTextMode({
+		textMode,
+		setTextMode,
+		canvasRef: fabricCanvasRef,
+		brushColor,
+		onTextCommitted: textObject => {
+			if (socket) {
+				socket.emit('object:modified', {
+					roomKey,
+					object: serializeObject(textObject),
+				})
+			}
+		},
+	})
+
+	useDrawingModes({
+		brushColor,
+		brushSize,
+		eraserSize,
+		isEraser,
+		isDrawingMode,
+		textMode,
+		fabricCanvasRef,
+	})
+
+	useSocketEvents({ fabricCanvasRef, socket })
 
 	// Загружает начальный снимок холста и восстанавливает viewport один раз на комнату.
 	useEffect(() => {
