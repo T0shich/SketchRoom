@@ -1,5 +1,5 @@
 import type { TPointerEventInfo } from 'fabric'
-import { Canvas, FabricImage, FabricObject, PencilBrush, util } from 'fabric'
+import { Canvas, FabricImage, FabricObject, IText, PencilBrush, util } from 'fabric'
 import { useEffect, useRef, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
@@ -71,6 +71,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 	const [brushColor, setBrushColor] = useState(INITIAL_BRUSH_COLOR)
 	const [brushSize, setBrushSize] = useState(INITIAL_BRUSH_SIZE)
 	const [isEraser, setIsEraser] = useState(false)
+	const [textMode, setTextMode] = useState(false)
 	const [eraserSize, setEraserSize] = useState(INITIAL_ERASER_SIZE)
 	const [isDrawingMode, setIsDrawingMode] = useState(true)
 	const [eraserPos, setEraserPos] = useState<{ x: number; y: number } | null>(null)
@@ -80,6 +81,52 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 	useEffect(() => {
 		snapshotLoadedRef.current = false
 	}, [roomKey])
+
+	useEffect(() => {
+		const canvas = fabricCanvasRef.current
+		if (!textMode || !canvas) return
+
+		const onMouseDown = (opt: TPointerEventInfo) => {
+			const target = opt.target
+			if (target instanceof IText) {
+				canvas.setActiveObject(target)
+				target.enterEditing()
+				target.selectAll()
+				canvas.renderAll()
+				setTextMode(false)
+				return
+			}
+
+			if (target) return
+
+			const point = canvas.getScenePoint(opt.e)
+			const interactiveText = new IText('', {
+				left: point.x,
+				top: point.y,
+				fontFamily: 'Helvetica',
+				fontWeight: 'bold',
+				fill: brushColor,
+				fontSize: 32,
+			})
+
+			canvas.add(interactiveText)
+			canvas.setActiveObject(interactiveText)
+			interactiveText.enterEditing()
+			interactiveText.selectAll()
+			canvas.renderAll()
+
+			if (socket) {
+				socket.emit('object:added', { roomKey, object: serializeObject(interactiveText) })
+			}
+
+			setTextMode(false)
+		}
+
+		canvas.on('mouse:down', onMouseDown)
+		return () => {
+			canvas.off('mouse:down', onMouseDown)
+		}
+	}, [textMode, brushColor, roomKey, socket])
 
 
 	useEffect(() => {
@@ -99,6 +146,16 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 			return
 		}
 
+		if (textMode) {
+			canvas.set({
+				isDrawingMode: false,
+				selection: false,
+				defaultCursor: 'text',
+				hoverCursor: 'text',
+			})
+			return
+		}
+
 		canvas.set({
 			isDrawingMode,
 			selection: true,
@@ -107,7 +164,7 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		})
 		brush.color = brushColor
 		brush.width = brushSize
-	}, [brushColor, brushSize, eraserSize, isDrawingMode, isEraser])
+	}, [brushColor, brushSize, eraserSize, isDrawingMode, isEraser, textMode])
 
 	useEffect(() => {
 		if (!canvasHostRef.current || !wrapperRef.current) return
@@ -181,7 +238,6 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 		})
 	}, [initialSnapshot, roomKey])
 
-	// курсор ластика
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current
 		if (!canvas) return
@@ -414,10 +470,13 @@ export const DrawingCanvas = ({ socket, roomKey, initialSnapshot = null }: Drawi
 				setBrushColor={color => {
 					setBrushColor(color)
 				}}
+
 				brushSize={brushSize}
 				setBrushSize={setBrushSize}
 				isEraser={isEraser}
 				setIsEraser={setIsEraser}
+				textMode={textMode}
+				setTextMode={setTextMode}
 				eraserSize={eraserSize}
 				setEraserSize={setEraserSize}
 				onClear={() => {
