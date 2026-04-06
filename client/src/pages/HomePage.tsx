@@ -1,14 +1,28 @@
 import { Link } from 'react-router-dom'
 import { getAuthUser, isAuthenticated } from '../store/Auth'
+import { Layout } from '../ui'
 import AuthButton from '../ui/AuthButton'
-import { Layout } from '../ui/Layout'
+import GenerativeBackground from '../components/GenerativeBackground'
 import AuthPage from './AuthPage'
+import { useEffect, useState } from 'react'
 const HomePage = () => {
 	const authenticated = isAuthenticated()
 	const user = getAuthUser()
+	const [isBackgroundVisible, setIsBackgroundVisible] = useState(false);
+
+	useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsBackgroundVisible(true);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
 
 	return (
 		<Layout>
+
+			{isBackgroundVisible && <GenerativeBackground />}
+
 			<div className='absolute right-0 top-0 flex justify-end'><AuthPage /></div>
 			<div className='flex min-h-screen items-center justify-center p-6'>
 				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-lg'>

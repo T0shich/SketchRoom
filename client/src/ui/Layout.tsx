@@ -5,5 +5,5 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children }: LayoutProps) => {
-	return <div className='h-screen w-full bg-slate-200 text-slate-900'>{children}</div>
+	return <div className='relative h-screen w-full text-slate-900'>{children}</div>
 }
