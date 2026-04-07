@@ -1,3 +1,8 @@
+import { LuBrush, LuEraser, LuLetterText, LuTrash2 } from "react-icons/lu"
+import { PiSelectionPlusBold } from "react-icons/pi"
+import { IoText } from "react-icons/io5"
+
+
 interface ToolbarProps {
 	brushColor: string
 	setBrushColor: (color: string) => void
@@ -10,8 +15,12 @@ interface ToolbarProps {
 	onClear: () => void
 	isDrawingMode: boolean
 	setIsDrawingMode: (isDrawingMode: boolean) => void
+	isEditingMode: boolean
+	setIsEditingMode: (isEdittingMode: boolean) => void
 	textMode: boolean
 	setTextMode: (textMode: boolean) => void
+	textSize: number
+	setTextSize: (size: number) => void
 }
 
 export const Toolbar = ({
@@ -26,14 +35,18 @@ export const Toolbar = ({
 	onClear,
 	isDrawingMode,
 	setIsDrawingMode,
+	isEditingMode,
+	setIsEditingMode,
 	textMode,
-	setTextMode
+	setTextMode,
+	textSize,
+	setTextSize,
 }: ToolbarProps) => {
 	const colors = ['#111827', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#14b8a6', '#ffffff']
-	
+
 	return (
 		<div className='absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur'>
-			{!isEraser && (
+			{(isDrawingMode || isEditingMode) && (
 				<div className='flex items-center gap-2'>
 					{colors.map(color => (
 						<button
@@ -46,54 +59,126 @@ export const Toolbar = ({
 				</div>
 			)}
 
-			<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
-				<input
-					type='range'
-					min={isEraser ? 8 : 1}
-					max={isEraser ? 120 : 50}
-					value={isEraser ? eraserSize : brushSize}
-					onChange={e =>
-						isEraser ? setEraserSize(Number(e.target.value)) : setBrushSize(Number(e.target.value))
-					}
-					className='accent-slate-700'
-				/>
-				<span className='w-10 text-xs text-slate-500'>
-					{isEraser ? eraserSize : brushSize}px
-				</span>
-			</div>
+			{textMode && (
+				<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
+					{/*small*/}
+					<button
+						onClick={() => setTextSize(20)}
+						title="Small"
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[14px] font-bold transition-all ${
+							textSize === 20
+								? 'bg-slate-900 text-white shadow-sm'
+								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+						}`}
+					>
+						{<IoText />}
+					</button>
+					{/*medium*/}
+					<button
+						onClick={() => setTextSize(40)}
+						title="Medium"
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[18px] font-bold transition-all ${
+							textSize === 40
+								? 'bg-slate-900 text-white shadow-sm'
+								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+						}`}
+					>
+						{/*large*/}
+						{<IoText />}
+					</button>
+					<button
+						onClick={() => setTextSize(80)}
+						title="Large"
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[22px] font-bold transition-all ${
+							textSize === 80
+								? 'bg-slate-900 text-white shadow-sm'
+								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+						}`}
+					>
+						{<IoText />}
+					</button>
+				</div>
+			)}
+
+			{!textMode && (
+				<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
+					<input
+						type='range'
+						min={isEraser ? 8 : 1}
+						max={isEraser ? 120 : 50}
+						value={isEraser ? eraserSize : brushSize}
+						onChange={e =>
+							isEraser
+								? setEraserSize(Number(e.target.value))
+								: setBrushSize(Number(e.target.value))
+						}
+						className='accent-slate-700'
+					/>
+					<span className='w-10 text-xs text-slate-500'>
+						{isEraser ? eraserSize : brushSize}px
+					</span>
+				</div>
+			)}
 
 			<div className='flex items-center gap-2 border-l border-slate-200 pl-3'>
 				<button
-					onClick={() => setIsDrawingMode(!isDrawingMode)}
-					disabled={isEraser}
-					className={`rounded-lg px-3 py-2 text-xs font-medium transition ${isEraser
-							? 'cursor-not-allowed opacity-40 bg-slate-100 text-slate-700'
-							: isDrawingMode
-								? 'bg-slate-900 text-white'
-								: 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+					onClick={() => {
+						setIsDrawingMode(true)
+						setIsEditingMode(false)
+						setIsEraser(false)
+						setTextMode(false)
+					}}
+					className={`rounded-lg px-3 py-2 text-xl font-medium transition  ${isDrawingMode && !isEraser && !textMode
+						? 'bg-slate-900 text-white'
+						: 'bg-slate-100 text-slate-700 hover:bg-slate-200'
 						}`}
 				>
-					{isDrawingMode ? 'Рисование' : 'Выделение'}
+					{<LuBrush />}
 				</button>
 				<button
-					onClick={() => setIsEraser(!isEraser)}
-					className={`rounded-lg px-3 py-2 text-xs font-medium transition ${isEraser ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+					onClick={() => {
+						setIsEditingMode(true)
+						setIsDrawingMode(false)
+						setIsEraser(false)
+						setTextMode(false)
+					}}
+					className={`rounded-lg px-3 py-2 text-xl font-medium transition ${isEditingMode
+						? 'bg-slate-900 text-white'
+						: 'bg-slate-100 text-slate-700 hover:bg-slate-200'
 						}`}
 				>
-					Ластик
+					{<PiSelectionPlusBold />}
+				</button>
+
+				<button
+					onClick={() => {
+						setIsEraser(true)
+						setIsDrawingMode(false)
+						setIsEditingMode(false)
+						setTextMode(false)
+					}}
+					className={`rounded-lg px-3 py-2 text-xl font-medium transition ${isEraser ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+						}`}
+				>
+					{<LuEraser />}
 				</button>
 				<button
-					onClick={() => setTextMode(!textMode)}
-					className={`rounded-lg px-3 py-2 text-xs font-medium transition ${textMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+					onClick={() => {
+						setTextMode(true)
+						setIsDrawingMode(false)
+						setIsEditingMode(false)
+						setIsEraser(false)
+					}}
+					className={`rounded-lg px-3 py-2 text-xl font-medium transition ${textMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
 						}`}
 				>
-					Текст
+					{<LuLetterText />}
 				</button>
 				<button
 					onClick={onClear}
-					className='rounded-lg bg-rose-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-rose-600'
+					className='rounded-lg bg-rose-500 px-3 py-2 text-xl font-medium text-white transition hover:bg-rose-600'
 				>
-					Очистить
+					{<LuTrash2 />}
 				</button>
 			</div>
 		</div>

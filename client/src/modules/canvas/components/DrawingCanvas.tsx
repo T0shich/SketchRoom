@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useCanvasInit } from '../hooks/useCanvasInit'
+import { useDrawingModes } from '../hooks/useDrawingModes'
 import { useEraser } from '../hooks/useEraser'
 import { usePasteImage } from '../hooks/usePasteImage'
 import { useSnapshotLoader } from '../hooks/useSnapshotLoader'
 import { useSocketSync } from '../hooks/useSocketSync'
+import { useTextMode } from '../hooks/useTextMode'
 import { serializeObject } from '../Socket/FabrickObjects'
 import { useSocketEvents } from '../Socket/useSocketEvents'
-import { useDrawingModes } from '../hooks/useDrawingModes'
-import { useTextMode } from '../hooks/useTextMode'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
@@ -33,8 +33,11 @@ export const DrawingCanvas = ({
 	const [brushSize, setBrushSize] = useState(INITIAL_BRUSH_SIZE)
 	const [isEraser, setIsEraser] = useState(false)
 	const [textMode, setTextMode] = useState(false)
+	const [textSize, setTextSize] = useState(40)
 	const [eraserSize, setEraserSize] = useState(INITIAL_ERASER_SIZE)
 	const [isDrawingMode, setIsDrawingMode] = useState(true)
+	const [isEditingMode, setIsEditingMode] = useState(false)
+
 
 	const { fabricCanvasRef, canvasHostRef, snapshotLoadedRef } = useCanvasInit({
 		roomKey,
@@ -63,6 +66,7 @@ export const DrawingCanvas = ({
 		setTextMode,
 		canvasRef: fabricCanvasRef,
 		brushColor,
+		textSize,
 		onTextCommitted: textObject => {
 			if (socket) {
 				socket.emit('object:added', {
@@ -118,6 +122,10 @@ export const DrawingCanvas = ({
 				onClear={onClear}
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
+				isEditingMode={isEditingMode}
+				setIsEditingMode={setIsEditingMode}
+				textSize={textSize}
+				setTextSize={setTextSize}
 			/>
 			<Zoom />
 			<ViewportScroller />

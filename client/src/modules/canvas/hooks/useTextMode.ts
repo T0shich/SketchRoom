@@ -12,6 +12,7 @@ interface TextModeProps {
 	setTextMode: (textMode: boolean) => void
 	canvasRef: RefObject<Canvas | null>
 	brushColor: string
+	textSize: number
 	onTextCommitted?: (text: FabricObject) => void
 }
 
@@ -20,6 +21,7 @@ export const useTextMode = ({
 	setTextMode,
 	canvasRef,
 	brushColor,
+	textSize,
 	onTextCommitted,
 }: TextModeProps) => {
 	useEffect(() => {
@@ -33,7 +35,6 @@ export const useTextMode = ({
 				target.enterEditing()
 				target.selectAll()
 				canvas.renderAll()
-				setTextMode(false)
 				return
 			}
 
@@ -46,7 +47,7 @@ export const useTextMode = ({
 				fontFamily: 'Helvetica',
 				fontWeight: 'bold',
 				fill: brushColor,
-				fontSize: 32,
+				fontSize: textSize,
 			})
 
 			canvas.add(interactiveText)
@@ -54,7 +55,6 @@ export const useTextMode = ({
 			interactiveText.enterEditing()
 			interactiveText.selectAll()
 			canvas.renderAll()
-			setTextMode(false)
 		}
 
 		const onTextEditingExited = (opt: { target: FabricObject }) => {
