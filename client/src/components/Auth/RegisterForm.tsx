@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { saveAuthToken } from '../../store/Auth'
 import { Button, Card, Input, Layout } from '../../ui'
+import GenerativeBackground from '../GenerativeBackground'
 
 const API_URL = import.meta.env.API_URL || 'http://localhost:3000'
 
@@ -49,6 +50,8 @@ const RegisterForm = () => {
 
 	return (
 		<Layout>
+			<GenerativeBackground />
+
 			<div className="flex items-center justify-center min-h-screen">
 				<Card className="flex flex-col h-fit w-fit gap-6">
 					<form onSubmit={handleSubmit} className="flex flex-col gap-6">

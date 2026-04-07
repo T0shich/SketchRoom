@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { clearAuthToken, getAuthUser, isAuthenticated } from '../store/Auth'
+import GenerativeBackground from '../components/GenerativeBackground'
 const AuthPage = () => {
 	const user = getAuthUser()
 	const authenticated = isAuthenticated()
@@ -9,8 +10,14 @@ const AuthPage = () => {
 		window.location.href = '/'
 	}
 
+
+
+
 	return (
 		<div className='flex gap-4 m-4'>
+
+			<GenerativeBackground />
+
 			{authenticated ? (
 				<>
 					<div className='rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 shadow-md'>
