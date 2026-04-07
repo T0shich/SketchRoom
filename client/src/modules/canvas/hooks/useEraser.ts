@@ -27,19 +27,16 @@ export const useEraser = ({
 		null,
 	)
 
-	// Сбрасываем позицию ластика, если режим выключен
 	if (!isEraser && eraserPos !== null) {
 		setEraserPos(null)
 	}
 
-	// Отрисовывает визуальный курсор ластика и обновляет его позицию по движению мыши.
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current
 		if (!canvas || !isEraser) {
 			return
 		}
 
-		// Обновляет координаты курсора ластика относительно canvas.
 		const onMouseMove = (opt: TPointerEventInfo) => {
 			const canvasEl = canvas.upperCanvasEl ?? canvas.lowerCanvasEl
 			if (!canvasEl) return
