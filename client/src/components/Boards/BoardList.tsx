@@ -69,8 +69,8 @@ const BoardList = () => {
 	}
 
 	return (
-		<div className="flex h-screen p-6">
-			<div className="w-full bg-white rounded-2xl shadow-md">
+		<div className="flex  p-6">
+			<div className="w-full bg-white  rounded-2xl shadow-md">
 				<div className='flex items-center justify-between px-8 pt-5 pb-3'>
 					<h1 className='text-3xl font-bold'>Мои доски</h1>
 					<button

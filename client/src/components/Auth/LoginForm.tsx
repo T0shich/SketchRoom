@@ -3,9 +3,8 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { saveAuthToken } from '../../store/Auth'
-import AuthButton from '../../ui/AuthButton'
-import AuthInput from '../../ui/AuthInput'
-import { Layout } from '../../ui/Layout'
+import { Button, Card, Input, Layout } from '../../ui'
+import GenerativeBackground from '../GenerativeBackground'
 
 const API_URL = import.meta.env.API_URL || 'http://localhost:3000'
 
@@ -49,24 +48,41 @@ const LoginForm = () => {
 
 	return (
 		<Layout>
+			<GenerativeBackground />
+
 			<div className="flex items-center justify-center min-h-screen">
-				<form onSubmit={handleSubmit} className="flex flex-col h-fit w-fit rounded-2xl bg-white px-13 py-10 gap-6 shadow-lg">
-					<h2 className='text-2xl text-slate-900/80 font-bold text-center my-8'>Вход в систему</h2>
+				<Card className="flex flex-col h-fit w-fit gap-6">
+					<form onSubmit={handleSubmit} className="flex flex-col gap-6">
+						<h2 className='text-2xl text-slate-900/80 font-bold text-center my-8'>Вход в систему</h2>
 
-					<div className="flex flex-col gap-7 min-w-80">
-						<AuthInput name='email' value={userData.email} onChange={handleChange} type='email' placeholder='Email' />
-						<AuthInput name='password' value={userData.password} onChange={handleChange} type='password' placeholder='Пароль' />
-					</div>
+						<div className="flex flex-col gap-7 min-w-80">
+							<Input
+								label="Email"
+								name='email'
+								value={userData.email}
+								onChange={handleChange}
+								type='email'
+								placeholder='Email'
+							/>
+							<Input
+								label="Пароль"
+								name='password'
+								value={userData.password}
+								onChange={handleChange}
+								type='password'
+								placeholder='Пароль'
+							/>
+						</div>
 
-					<AuthButton type='submit' className='mt-6'>
-						Войти
-					</AuthButton>
-					<span className='text-center text-slate-600/70'>
-						Нет аккаунта? <Link to='/register' className='text-blue-500/80 hover:underline'>Зарегистрироваться</Link>
-					</span>
-				</form>
+						<Button type='submit' className='mt-6'>
+							Войти
+						</Button>
+						<span className='text-center text-slate-600/70'>
+							Нет аккаунта? <Link to='/register' className='text-blue-500/80 hover:underline'>Зарегистрироваться</Link>
+						</span>
+					</form>
+				</Card>
 			</div>
-
 		</Layout>
 	)
 }
