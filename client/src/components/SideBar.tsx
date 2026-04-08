@@ -69,23 +69,27 @@ const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
 			className='flex h-full w-20 flex-col items-center border-r border-slate-200 bg-white/80 px-3 py-5 backdrop-blur  transition-all duration-500 ease-in-out hover:w-64'>
 			<div className='mb-6 text-xs font-semibold tracking-[0.18em] text-slate-400'>SR</div>
 			{data?.users && (
-				<div className='space-y-2  '>
+				<ul className='space-y-2  w-full overflow-hidden '>
 					{data.users.map((user, index) => (
-						user?.admin === true ? (
-							<li className='list-none bg-yellow-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 transition-colors' key={index}>
-								{isActive ? user.id.slice(0,10) : user.id[0]} 
-								</li>
-						) :
-							(
-								<li className='list-none bg-slate-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 transition-colors' key={index}>
-									{isActive ? user.id : user.id[0]}
-								</li>
-							)
+						<li
+							key={index}
+							className={`
+                list-none py-2 px-4 shadow-sm rounded-xl font-bold text-lg 
+                hover:bg-white/90 transition-all duration-300
+                truncate whitespace-nowrap text-center
+                ${user?.admin ? 'bg-yellow-100 text-gray-700' : 'bg-slate-100 text-gray-700'}
+              `}
+							title={user.id.slice(0, 10)} 
+						>
+							{isActive ? user.id.slice(0, 10) : user.id[0]}
+						</li>
 					))}
-				</div>
+				</ul>
 			)}
-			<div className='mt-auto list-none bg-slate-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 '>
-				{isActive ? currentUserEmail : currentUserEmail[0]}
+			<div className='mt-auto w-full text-center list-none bg-slate-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 truncate ' >
+				<span className='whitespace-nowrap'>
+					{isActive ? currentUserEmail : currentUserEmail[0]}
+				</span>
 			</div>
 		</aside>
 	)
