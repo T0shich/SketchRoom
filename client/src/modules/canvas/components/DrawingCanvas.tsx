@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useCanvasInit } from '../hooks/useCanvasInit'
@@ -8,12 +8,12 @@ import { usePasteImage } from '../hooks/usePasteImage'
 import { useSnapshotLoader } from '../hooks/useSnapshotLoader'
 import { useSocketSync } from '../hooks/useSocketSync'
 import { useTextMode } from '../hooks/useTextMode'
+import { useUndoRedo } from '../hooks/useUndoRedo'
 import { serializeObject } from '../Socket/FabrickObjects'
 import { useSocketEvents } from '../Socket/useSocketEvents'
 import { Toolbar } from './Toolbar'
 import { ViewportScroller } from './ViewportScroller'
 import { Zoom } from './Zoom'
-import { useUndoRedo } from '../hooks/useUndoRedo'
 
 interface DrawingCanvasProps {
 	socket: Socket | null
@@ -44,28 +44,24 @@ export const DrawingCanvas = ({
 		initialBrushColor: INITIAL_BRUSH_COLOR,
 		initialBrushSize: INITIAL_BRUSH_SIZE,
 	})
-	
+
 	const { eraserPos } = useEraser({
 		fabricCanvasRef,
 		socket,
 		roomKey,
 		isEraser,
 	})
-	
-	
-	useEffect(() => {
-		console.log(fabricCanvasRef.current?.getObjects())
-	})
-	
+
+
 	usePasteImage({ socket, roomKey })
-	
+
 	useSnapshotLoader({
 		fabricCanvasRef,
 		initialSnapshot,
 		snapshotLoadedRef,
 		roomKey,
 	})
-	
+
 	useTextMode({
 		textMode,
 		setTextMode,
@@ -91,7 +87,7 @@ export const DrawingCanvas = ({
 		textMode,
 		fabricCanvasRef,
 	})
-	
+
 	useSocketEvents({ fabricCanvasRef, socket })
 
 	useSocketSync({
@@ -100,7 +96,7 @@ export const DrawingCanvas = ({
 		roomKey,
 		isEraser,
 	})
-	
+
 	const onClear = () => {
 		fabricCanvasRef.current?.getObjects().forEach(obj => {
 			fabricCanvasRef.current?.remove(obj)
@@ -110,9 +106,10 @@ export const DrawingCanvas = ({
 			socket.emit('canvas:clear', { roomKey })
 		}
 	}
-	
+
 	useUndoRedo()
-	
+
+
 	return (
 		<div className='relative h-full w-full bg-slate-50'>
 			<Toolbar
