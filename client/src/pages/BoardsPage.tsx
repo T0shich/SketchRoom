@@ -1,11 +1,14 @@
 import BoardList from '../components/Boards/BoardList'
-import { Layout } from '../ui/Layout'
 
 const BoardsPage = () => {
 	return (
-		<Layout>
-				<BoardList />
-		</Layout>
+		<div className='relative overflow-y-auto w-full h-full text-slate-900'>
+
+			<BoardList />
+
+		</div>
+
+
 	)
 }
 

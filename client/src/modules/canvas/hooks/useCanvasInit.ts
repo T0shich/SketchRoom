@@ -37,7 +37,11 @@ export const useCanvasInit = ({
 			isDrawingMode: true,
 		})
 		canvas.backgroundColor = '#ffffff'
-		canvas.renderAll()
+		try {
+			canvas.renderAll()
+		} catch (error) {
+			console.warn('Initial renderAll failed:', error)
+		}
 
 		canvas.freeDrawingBrush = new PencilBrush(canvas)
 		canvas.freeDrawingBrush.color = initialBrushColor
@@ -49,11 +53,15 @@ export const useCanvasInit = ({
 
 		const handleResize = () => {
 			if (!canvasHostRef.current) return
-			canvas.setDimensions({
-				width: canvasHostRef.current.clientWidth,
-				height: canvasHostRef.current.clientHeight,
-			})
-			canvas.renderAll()
+			try {
+				canvas.setDimensions({
+					width: canvasHostRef.current.clientWidth,
+					height: canvasHostRef.current.clientHeight,
+				})
+				canvas.renderAll()
+			} catch (error) {
+				console.warn('Resize renderAll failed:', error)
+			}
 		}
 
 		window.addEventListener('resize', handleResize)
