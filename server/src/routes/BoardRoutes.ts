@@ -4,11 +4,7 @@ import { AuthMiddleware } from '../middleware/AuthMiddleware'
 export function BoardRoutes(app: express.Application) {
 	const boardController = BoardController()
 	app.get('/boards', AuthMiddleware, boardController.getBoards)
-	app.get(
-		'/boards/room/:roomKey',
-		AuthMiddleware,
-		boardController.getBoardByRoomKey,
-	)
+
 	app.get('/boards/:id', AuthMiddleware, boardController.getBoardById)
 	app.post('/boards', AuthMiddleware, boardController.createBoard)
 	app.put(

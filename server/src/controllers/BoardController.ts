@@ -57,41 +57,7 @@ export function BoardController() {
 		}
 	}
 
-	const getBoardByRoomKey = async (req: Request, res: Response) => {
-		try {
-			const userId = req.userId
-			const { roomKey } = req.params
-			const normalizedRoomKey = normalizeRoomKey(
-				typeof roomKey === 'string' ? roomKey : undefined,
-			)
-
-			if (!userId) {
-				return res.status(401).json({ message: 'Unauthorized' })
-			}
-
-			if (!normalizedRoomKey) {
-				return res.status(400).json({ message: 'Invalid room key' })
-			}
-
-			const board = await prisma.board.findFirst({
-				where: {
-					roomKey: normalizedRoomKey,
-				},
-			})
-
-			if (!board) {
-				return res.status(404).json({ message: 'Board not found' })
-			}
-
-			ensureRoomRecord(board.roomKey)
-
-			res.status(200).json({ board })
-		} catch (error) {
-			console.error('Error fetching board:', error)
-			res.status(500).json({ message: 'Server error' })
-		}
-	}
-
+	
 	const createBoard = async (req: Request, res: Response) => {
 		try {
 			const userId = req.userId
@@ -185,7 +151,6 @@ export function BoardController() {
 	return {
 		getBoards,
 		getBoardById,
-		getBoardByRoomKey,
 		createBoard,
 		updateBoardSnapshot,
 		deleteBoard,

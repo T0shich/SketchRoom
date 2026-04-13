@@ -41,13 +41,6 @@ export const BoardAPI = {
 		return res.data.board
 	},
 
-	getBoardByRoomKey: async (roomKey: string): Promise<Board> => {
-		const res = await axios.get(`${API_URL}/boards/room/${roomKey}`, {
-			headers: getHeaders(),
-		})
-		return res.data.board
-	},
-
 	createBoard: async (title: string, roomKey: string): Promise<Board> => {
 		const res = await axios.post(
 			`${API_URL}/boards`,
