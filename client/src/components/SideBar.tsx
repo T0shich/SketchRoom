@@ -71,20 +71,25 @@ const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
 			<div className='mb-6 text-xs font-semibold tracking-[0.18em] text-slate-400'>SR</div>
 			{data?.users && (
 				<ul className='space-y-2  w-full overflow-hidden '>
-					{data.users.map((user, index) => (
-						<li
-							key={index}
-							className={`
+					{data.users.map((user, index) => {
+						const displayName = (user.name || user.id).trim()
+						return (
+							<li
+								key={index}
+								className={
+									`
                 list-none py-2 px-4 shadow-sm rounded-xl font-bold text-lg 
                 hover:bg-white/90 transition-all duration-300
                 truncate whitespace-nowrap text-center
                 ${user?.admin ? 'bg-yellow-100 text-gray-700' : 'bg-slate-100 text-gray-700'}
-              `}
-							title={user.id.slice(0, 10)}
-						>
-							{isActive ? user.id.slice(0, 10) : user.id[0]}
-						</li>
-					))}
+              `
+								}
+								title={displayName}
+							>
+								{isActive ? displayName : displayName[0]}
+							</li>
+						)
+					})}
 				</ul>
 			)}
 			<div className='mt-auto w-full text-center list-none bg-slate-100 text-gray-700 py-2 px-4 shadow-sm rounded-xl font-bold text-xl hover:bg-white/90 truncate ' >

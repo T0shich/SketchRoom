@@ -44,62 +44,78 @@ export function RoomHandler(io: Server) {
 			socket.emit('leftRoom', { success: true })
 		})
 
-		socket.on('joinRoom', (roomKey: string) => {
-			const normalizedKey = normalizeRoomKey(roomKey)
-			if (!normalizedKey) {
-				socket.emit('joinedRoom', {
-					success: false,
-					message: 'Некорректный ключ комнаты',
-				})
-				return
-			}
+		socket.on(
+			'joinRoom',
+			(payload: string | { roomKey: string; userName?: string }) => {
+				const roomKey = typeof payload === 'string' ? payload : payload.roomKey
+				const rawUserName =
+					typeof payload === 'string' ? undefined : payload.userName
+				const userName =
+					typeof rawUserName === 'string'
+						? rawUserName.trim().slice(0, 50)
+						: undefined
 
-			const room = rooms.get(normalizedKey)
-			if (!room) {
-				socket.emit('joinedRoom', {
-					success: false,
-					message: 'Комната не найдена',
-					roomKey: normalizedKey,
-				})
-				return
-			}
-
-			const currentRoomKey = normalizeRoomKey(socket.data.roomKey)
-			if (currentRoomKey && currentRoomKey !== normalizedKey) {
-				socket.leave(currentRoomKey)
-				const previousRoom = rooms.get(currentRoomKey)
-				if (previousRoom) {
-					previousRoom.users = previousRoom.users.filter(
-						(user: User) => user.id !== socket.id,
-					)
-					emitRoomUsersUpdated(currentRoomKey)
+				const normalizedKey = normalizeRoomKey(roomKey)
+				if (!normalizedKey) {
+					socket.emit('joinedRoom', {
+						success: false,
+						message: 'Некорректный ключ комнаты',
+					})
+					return
 				}
-			}
 
-			socket.join(normalizedKey)
-			socket.data.roomKey = normalizedKey
-			if (!room.users.some((user: User) => user.id === socket.id)) {
-				const isFirstUser = room.users.length === 0
-				room.users.push({ id: socket.id, admin: isFirstUser })
-			}
-			emitRoomUsersUpdated(normalizedKey)
+				const room = rooms.get(normalizedKey)
+				if (!room) {
+					socket.emit('joinedRoom', {
+						success: false,
+						message: 'Комната не найдена',
+						roomKey: normalizedKey,
+					})
+					return
+				}
 
-			// Отправляем нового пользователя информацию о комнате (ack)
-			// Клиент может запросить текущее состояние холста после регистрации обработчиков
+				const currentRoomKey = normalizeRoomKey(socket.data.roomKey)
+				if (currentRoomKey && currentRoomKey !== normalizedKey) {
+					socket.leave(currentRoomKey)
+					const previousRoom = rooms.get(currentRoomKey)
+					if (previousRoom) {
+						previousRoom.users = previousRoom.users.filter(
+							(user: User) => user.id !== socket.id,
+						)
+						emitRoomUsersUpdated(currentRoomKey)
+					}
+				}
 
-			console.log(`${socket.id} присоединился к комнате ${normalizedKey}`)
-			socket.emit('joinedRoom', { success: true, roomKey: normalizedKey })
+				socket.join(normalizedKey)
+				socket.data.roomKey = normalizedKey
+				const existingUser = room.users.find(
+					(user: User) => user.id === socket.id,
+				)
+				if (!existingUser) {
+					const isFirstUser = room.users.length === 0
+					room.users.push({ id: socket.id, name: userName, admin: isFirstUser })
+				} else if (userName) {
+					existingUser.name = userName
+				}
+				emitRoomUsersUpdated(normalizedKey)
 
-			// Позволяем клиенту запросить текущее состояние холста в удобное для него времени
-			socket.on('requestCanvasState', (reqRoomKey: string) => {
-				const requestedKey = normalizeRoomKey(reqRoomKey)
-				if (!requestedKey) return
-				const r = rooms.get(requestedKey)
-				if (!r) return
-				// отправляем только запрашивающему сокету
-				socket.emit('canvas:loadState', { objects: r.canvasObjects })
-			})
-		})
+				// Отправляем нового пользователя информацию о комнате (ack)
+				// Клиент может запросить текущее состояние холста после регистрации обработчиков
+
+				console.log(`${socket.id} присоединился к комнате ${normalizedKey}`)
+				socket.emit('joinedRoom', { success: true, roomKey: normalizedKey })
+
+				// Позволяем клиенту запросить текущее состояние холста в удобное для него времени
+				socket.on('requestCanvasState', (reqRoomKey: string) => {
+					const requestedKey = normalizeRoomKey(reqRoomKey)
+					if (!requestedKey) return
+					const r = rooms.get(requestedKey)
+					if (!r) return
+					// отправляем только запрашивающему сокету
+					socket.emit('canvas:loadState', { objects: r.canvasObjects })
+				})
+			},
+		)
 
 		socket.on('disconnect', () => {
 			for (const [roomKey, room] of rooms.entries()) {

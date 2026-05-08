@@ -23,6 +23,7 @@ const EditorPage = () => {
 	const token = getAuthToken()
 	const user = getAuthUser()
 	const authenticated = Boolean(token && user)
+	const userName = user?.name || user?.email || ''
 	const modeQuery = searchParams.get('mode')
 	const boardId = searchParams.get('boardId')
 	const initialMode = modeQuery === 'join' ? 'join' : 'create'
@@ -125,8 +126,8 @@ const EditorPage = () => {
 
 	useEffect(() => {
 		if (!board?.roomKey || !isConnecting) return
-		socket.emit('joinRoom', board.roomKey)
-	}, [board?.roomKey, isConnecting])
+		socket.emit('joinRoom', { roomKey: board.roomKey, userName })
+	}, [board?.roomKey, isConnecting, userName])
 
 	// Keep local roomKey state aligned with URL when not in board mode
 	useEffect(() => {
@@ -170,9 +171,9 @@ const EditorPage = () => {
 		const paramRoomKey = searchParams.get('roomKey')
 		if (!paramRoomKey) return
 		if (isConnecting) {
-			socket.emit('joinRoom', paramRoomKey)
+			socket.emit('joinRoom', { roomKey: paramRoomKey, userName })
 		}
-	}, [searchParams, isConnecting])
+	}, [searchParams, isConnecting, userName])
 
 	useEffect(() => {
 		if (!authenticated || !token || !boardId) {
@@ -208,7 +209,7 @@ const EditorPage = () => {
 			return
 		}
 
-		socket.emit('joinRoom', upperKey)
+		socket.emit('joinRoom', { roomKey: upperKey, userName })
 	}
 
 	const saveBoardSnapshot = async () => {

@@ -1,14 +1,16 @@
-//ЗАМЕНИТЬ 
+//ЗАМЕНИТЬ
 export const AUTH_TOKEN_KEY = 'sketchroom_token'
 
 export interface AuthUser {
 	userId: string
 	email: string
+	name?: string
 }
 
 interface JwtPayload {
 	userId?: string
 	email?: string
+	name?: string
 }
 
 const parseJwtPayload = (token: string): JwtPayload | null => {
@@ -47,6 +49,7 @@ export const getAuthUser = (): AuthUser | null => {
 	return {
 		userId: payload.userId,
 		email: payload.email,
+		name: payload.name,
 	}
 }
 
