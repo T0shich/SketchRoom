@@ -5,8 +5,8 @@ import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 
 const MAX_EVENTS_PER_SECOND = {
 	added: 20,
-	modified: 60, 
-	cleared: 5, 
+	modified: 60,
+	cleared: 5,
 	removed: 20,
 }
 
@@ -72,7 +72,26 @@ export function DrawHandler(io: Server) {
 
 			const room = rooms.get(normalizedKey)
 			if (room) {
-				room.canvasObjects.push(data.object)
+				// ensure we don't keep duplicates - replace if socketObjectId exists
+				try {
+					const objData = data.object as Record<string, unknown>
+					const objId = objData?.socketObjectId as string | undefined
+					if (objId) {
+						const idx = room.canvasObjects.findIndex((o: unknown) => {
+							const oo = o as Record<string, unknown>
+							return oo.socketObjectId === objId
+						})
+						if (idx !== -1) {
+							room.canvasObjects[idx] = data.object
+						} else {
+							room.canvasObjects.push(data.object)
+						}
+					} else {
+						room.canvasObjects.push(data.object)
+					}
+				} catch (e) {
+					room.canvasObjects.push(data.object)
+				}
 			}
 
 			socket.to(normalizedKey).emit('object:added_s', { object: data.object })
@@ -104,13 +123,21 @@ export function DrawHandler(io: Server) {
 			const room = rooms.get(normalizedKey)
 			if (room && data.object) {
 				const objectData = data.object as Record<string, unknown>
-				const objectId = objectData.socketObjectId
-				const index = room.canvasObjects.findIndex((obj: unknown) => {
-					const o = obj as Record<string, unknown>
-					return o.socketObjectId === objectId
-				})
-				if (index !== -1) {
-					room.canvasObjects[index] = data.object
+				const objectId = objectData.socketObjectId as string | undefined
+				if (objectId) {
+					const index = room.canvasObjects.findIndex((obj: unknown) => {
+						const o = obj as Record<string, unknown>
+						return o.socketObjectId === objectId
+					})
+					if (index !== -1) {
+						room.canvasObjects[index] = data.object
+					} else {
+						// If we don't have it yet (some clients send modify before add), add it
+						room.canvasObjects.push(data.object)
+					}
+				} else {
+					// no id - best effort: push
+					room.canvasObjects.push(data.object)
 				}
 			}
 
