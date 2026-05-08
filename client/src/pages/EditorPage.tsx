@@ -15,6 +15,17 @@ interface JoinedRoomResponse {
 	message?: string
 }
 
+interface RoomUser {
+	id: string
+	name?: string
+	admin?: boolean
+}
+
+interface RoomUsersUpdatedPayload {
+	roomKey: string
+	users: RoomUser[]
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket: Socket = io(API_URL)
 
@@ -23,7 +34,6 @@ const EditorPage = () => {
 	const token = getAuthToken()
 	const user = getAuthUser()
 	const authenticated = Boolean(token && user)
-	const userName = user?.name || user?.email || ''
 	const modeQuery = searchParams.get('mode')
 	const boardId = searchParams.get('boardId')
 	const initialMode = modeQuery === 'join' ? 'join' : 'create'
@@ -33,6 +43,7 @@ const EditorPage = () => {
 	const [socketId, setSocketId] = useState<string>('')
 	const [roomKey, setRoomKey] = useState<string | null>(null)
 	const [joinError, setJoinError] = useState<string>('')
+	const [roomUsers, setRoomUsers] = useState<RoomUser[]>([])
 	const [board, setBoard] = useState<Board | null>(null)
 	const [isBoardLoading, setIsBoardLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
@@ -40,6 +51,9 @@ const EditorPage = () => {
 	const [boardError, setBoardError] = useState('')
 	const previousActiveRoomKeyRef = useRef<string | null>(null)
 	const activeRoomKey = (board?.roomKey ?? roomKey)?.toUpperCase() ?? null
+	const isRoomAdmin = Boolean(
+		activeRoomKey && roomUsers.find(u => u.id === socketId)?.admin,
+	)
 
 	// Normalize /editor URL params to avoid mixed/invalid states:
 	// boardId > roomKey > mode(create|join)
@@ -125,9 +139,28 @@ const EditorPage = () => {
 	}, [])
 
 	useEffect(() => {
+		if (!activeRoomKey) {
+			setRoomUsers([])
+			return
+		}
+
+		const handleRoomUsersUpdated = (payload: RoomUsersUpdatedPayload) => {
+			if (!payload?.roomKey) return
+			if (payload.roomKey.toUpperCase() !== activeRoomKey) return
+			setRoomUsers(Array.isArray(payload.users) ? payload.users : [])
+		}
+
+		socket.on('roomUsersUpdated', handleRoomUsersUpdated)
+		return () => {
+			socket.off('roomUsersUpdated', handleRoomUsersUpdated)
+		}
+	}, [activeRoomKey])
+
+	useEffect(() => {
 		if (!board?.roomKey || !isConnecting) return
+		const userName = user?.name || user?.email
 		socket.emit('joinRoom', { roomKey: board.roomKey, userName })
-	}, [board?.roomKey, isConnecting, userName])
+	}, [board?.roomKey, isConnecting])
 
 	// Keep local roomKey state aligned with URL when not in board mode
 	useEffect(() => {
@@ -171,9 +204,10 @@ const EditorPage = () => {
 		const paramRoomKey = searchParams.get('roomKey')
 		if (!paramRoomKey) return
 		if (isConnecting) {
+			const userName = user?.name || user?.email
 			socket.emit('joinRoom', { roomKey: paramRoomKey, userName })
 		}
-	}, [searchParams, isConnecting, userName])
+	}, [searchParams, isConnecting])
 
 	useEffect(() => {
 		if (!authenticated || !token || !boardId) {
@@ -209,6 +243,7 @@ const EditorPage = () => {
 			return
 		}
 
+		const userName = user?.name || user?.email
 		socket.emit('joinRoom', { roomKey: upperKey, userName })
 	}
 
@@ -337,7 +372,7 @@ const EditorPage = () => {
 						</div>
 					</div>
 					<div className='min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
-						<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} />
+						<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} canClear={isRoomAdmin} />
 					</div>
 				</main>
 			</div>

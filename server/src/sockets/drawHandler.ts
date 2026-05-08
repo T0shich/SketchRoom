@@ -1,6 +1,6 @@
 import { Server } from 'socket.io'
 import { rooms } from '../store/rooms'
-import { CanvasClearPayload, CanvasObjectPayload } from '../types/Types'
+import { CanvasClearPayload, CanvasObjectPayload, User } from '../types/Types'
 import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 
 const MAX_EVENTS_PER_SECOND = {
@@ -168,8 +168,16 @@ export function DrawHandler(io: Server) {
 				return
 			}
 			if (!rooms.has(normalizedKey)) return
-
 			const room = rooms.get(normalizedKey)
+			const roomUser = room?.users?.find((u: User) => u.id === socket.id)
+			if (!roomUser?.admin) {
+				socket.emit('error', {
+					code: 'FORBIDDEN',
+					message: 'Только админ комнаты может очистить холст',
+				})
+				return
+			}
+
 			if (room) {
 				room.canvasObjects = []
 			}
