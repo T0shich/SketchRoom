@@ -1,7 +1,7 @@
 import { Server } from 'socket.io'
-import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 import { rooms } from '../store/rooms'
 import { User } from '../types/Types'
+import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 
 export function RoomHandler(io: Server) {
 	const emitRoomUsersUpdated = (roomKey: string) => {
@@ -16,7 +16,7 @@ export function RoomHandler(io: Server) {
 
 	io.on('connection', socket => {
 		console.log('Подключился', socket.id)
-		
+
 		socket.on('joinRoom', (roomKey: string) => {
 			const normalizedKey = normalizeRoomKey(roomKey)
 			if (!normalizedKey) {
@@ -57,8 +57,21 @@ export function RoomHandler(io: Server) {
 			}
 			emitRoomUsersUpdated(normalizedKey)
 
+			// Отправляем нового пользователя информацию о комнате (ack)
+			// Клиент может запросить текущее состояние холста после регистрации обработчиков
+
 			console.log(`${socket.id} присоединился к комнате ${normalizedKey}`)
 			socket.emit('joinedRoom', { success: true, roomKey: normalizedKey })
+
+			// Позволяем клиенту запросить текущее состояние холста в удобное для него времени
+			socket.on('requestCanvasState', (reqRoomKey: string) => {
+				const requestedKey = normalizeRoomKey(reqRoomKey)
+				if (!requestedKey) return
+				const r = rooms.get(requestedKey)
+				if (!r) return
+				// отправляем только запрашивающему сокету
+				socket.emit('canvas:loadState', { objects: r.canvasObjects })
+			})
 		})
 
 		socket.on('disconnect', () => {

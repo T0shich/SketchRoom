@@ -15,7 +15,9 @@ export function AuthController() {
 
 			// Валидация обязательных полей
 			if (!email || !password || !name) {
-				const response: AuthResponse = { message: 'Пожалуйста, заполните все поля' }
+				const response: AuthResponse = {
+					message: 'Пожалуйста, заполните все поля',
+				}
 				res.status(400).json(response)
 				return
 			}
@@ -23,27 +25,39 @@ export function AuthController() {
 			// Валидация email
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 			if (!emailRegex.test(email)) {
-				const response: AuthResponse = { message: 'Введите корректный email', field: 'email' }
+				const response: AuthResponse = {
+					message: 'Введите корректный email',
+					field: 'email',
+				}
 				res.status(400).json(response)
 				return
 			}
 
 			// Валидация пароля
 			if (password.length < 6) {
-				const response: AuthResponse = { message: 'Пароль должен содержать минимум 6 символов', field: 'password' }
+				const response: AuthResponse = {
+					message: 'Пароль должен содержать минимум 6 символов',
+					field: 'password',
+				}
 				res.status(400).json(response)
 				return
 			}
 
 			// Валидация имени
 			if (name.trim().length < 2) {
-				const response: AuthResponse = { message: 'Имя должно содержать минимум 2 символа', field: 'name' }
+				const response: AuthResponse = {
+					message: 'Имя должно содержать минимум 2 символа',
+					field: 'name',
+				}
 				res.status(400).json(response)
 				return
 			}
 
 			if (name.trim().length > 50) {
-				const response: AuthResponse = { message: 'Имя не должно превышать 50 символов', field: 'name' }
+				const response: AuthResponse = {
+					message: 'Имя не должно превышать 50 символов',
+					field: 'name',
+				}
 				res.status(400).json(response)
 				return
 			}
@@ -51,7 +65,10 @@ export function AuthController() {
 			// Проверяем, существует ли пользователь с такой почтой
 			const existingUser = await prisma.user.findUnique({ where: { email } })
 			if (existingUser) {
-				const response: AuthResponse = { message: 'Пользователь с таким email уже существует', field: 'email' }
+				const response: AuthResponse = {
+					message: 'Пользователь с таким email уже существует',
+					field: 'email',
+				}
 				res.status(400).json(response)
 				return
 			}
@@ -101,21 +118,30 @@ export function AuthController() {
 			// Валидация email
 			const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 			if (!emailRegex.test(email)) {
-				const response: AuthResponse = { message: 'Введите корректный email', field: 'email' }
+				const response: AuthResponse = {
+					message: 'Введите корректный email',
+					field: 'email',
+				}
 				res.status(400).json(response)
 				return
 			}
 
 			const user = await prisma.user.findUnique({ where: { email } })
 			if (!user) {
-				const response: AuthResponse = { message: 'Пользователь не найден', field: 'email' }
+				const response: AuthResponse = {
+					message: 'Пользователь не найден',
+					field: 'email',
+				}
 				res.status(404).json(response)
 				return
 			}
 
 			const isPasswordValid = comparePassword(password, user.password)
 			if (!isPasswordValid) {
-				const response: AuthResponse = { message: 'Неверный пароль', field: 'password' }
+				const response: AuthResponse = {
+					message: 'Неверный пароль',
+					field: 'password',
+				}
 				res.status(401).json(response)
 				return
 			}

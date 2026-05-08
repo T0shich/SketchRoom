@@ -88,7 +88,7 @@ export const DrawingCanvas = ({
 		fabricCanvasRef,
 	})
 
-	useSocketEvents({ fabricCanvasRef, socket })
+	useSocketEvents({ fabricCanvasRef, socket, roomKey })
 
 	useSocketSync({
 		fabricCanvasRef,

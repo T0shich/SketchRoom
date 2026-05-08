@@ -8,6 +8,7 @@ export interface Room {
 	key: string
 	createdAt: Date
 	users: User[]
+	canvasObjects: unknown[]
 }
 
 export interface CanvasObjectPayload {

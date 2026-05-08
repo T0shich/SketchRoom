@@ -1,7 +1,8 @@
 import { Server } from 'socket.io'
 import { rooms } from '../store/rooms'
+import { CanvasClearPayload, CanvasObjectPayload } from '../types/Types'
 import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
-import { CanvasObjectPayload, CanvasClearPayload } from '../types/Types'
+
 export function DrawHandler(io: Server) {
 	io.on('connection', socket => {
 		socket.on('object:added', (data: CanvasObjectPayload) => {
@@ -13,6 +14,11 @@ export function DrawHandler(io: Server) {
 			)
 				return
 			if (!rooms.has(normalizedKey)) return
+
+			const room = rooms.get(normalizedKey)
+			if (room) {
+				room.canvasObjects.push(data.object)
+			}
 
 			socket.to(normalizedKey).emit('object:added_s', { object: data.object })
 		})
@@ -26,6 +32,19 @@ export function DrawHandler(io: Server) {
 			)
 				return
 			if (!rooms.has(normalizedKey)) return
+
+			const room = rooms.get(normalizedKey)
+			if (room && data.object) {
+				const objectData = data.object as Record<string, unknown>
+				const objectId = objectData.socketObjectId
+				const index = room.canvasObjects.findIndex((obj: unknown) => {
+					const o = obj as Record<string, unknown>
+					return o.socketObjectId === objectId
+				})
+				if (index !== -1) {
+					room.canvasObjects[index] = data.object
+				}
+			}
 
 			socket
 				.to(normalizedKey)
@@ -42,6 +61,11 @@ export function DrawHandler(io: Server) {
 				return
 			if (!rooms.has(normalizedKey)) return
 
+			const room = rooms.get(normalizedKey)
+			if (room) {
+				room.canvasObjects = []
+			}
+
 			socket.to(normalizedKey).emit('canvas:clear_s')
 		})
 
@@ -56,6 +80,14 @@ export function DrawHandler(io: Server) {
 				)
 					return
 				if (!rooms.has(normalizedKey)) return
+
+				const room = rooms.get(normalizedKey)
+				if (room) {
+					room.canvasObjects = room.canvasObjects.filter((obj: unknown) => {
+						const o = obj as Record<string, unknown>
+						return o.socketObjectId !== data.objectId
+					})
+				}
 
 				socket
 					.to(normalizedKey)
