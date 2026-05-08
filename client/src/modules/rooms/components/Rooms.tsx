@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BoardAPI } from '../../../store/BoardAPI'
-import { useNavigate, useSearchParams } from 'react-router-dom'
 
 interface RoomsProps {
 	onJoinRoom: (key: string) => void
@@ -19,7 +19,7 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 	const [error, setError] = useState<string>('')
 	const [isLoading, setIsLoading] = useState(false)
 	const [isCreating, setIsCreating] = useState(false)
- 
+
 	useEffect(() => {
 		setMode(initialMode)
 		setError('')
@@ -28,7 +28,7 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 	const createRoom = async () => {
 		setIsLoading(true)
 		setError('')
-		
+
 
 		const title = inputName.trim() || 'Новая доска'
 		setIsCreating(true)
@@ -60,7 +60,7 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 		setIsLoading(true)
 		setError('')
 		try {
-			const response = await axios.get(`http://localhost:3000/rooms/${key}`)
+			const response = await axios.get(`${API_URL}/rooms/${key}`)
 			if (response.data.exists) {
 				setRoomKey(response.data.key)
 				onJoinRoom(response.data.key)

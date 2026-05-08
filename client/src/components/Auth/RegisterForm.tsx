@@ -6,7 +6,7 @@ import { saveAuthToken } from '../../store/Auth'
 import { Button, Card, Input, Layout } from '../../ui'
 import GenerativeBackground from '../GenerativeBackground'
 
-const API_URL = import.meta.env.API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 const RegisterForm = () => {
 	const navigate = useNavigate()

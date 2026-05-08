@@ -31,7 +31,7 @@ prisma
 	.then(() => {
 		console.log('Подключение к базе данных успешно')
 	})
-	.catch(err => {
+	.catch((err: Error) => {
 		console.error('Ошибка подключения к базе данных:', err)
 	})
 
