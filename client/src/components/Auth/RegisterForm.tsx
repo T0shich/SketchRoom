@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { saveAuthToken } from '../../store/Auth'
+import { saveAuthToken, saveRefreshToken } from '../../store/Auth'
 import { Button, Card, Input, Layout } from '../../ui'
 import { validateRegisterForm, type ValidationErrors } from '../../utils/validation'
 import GenerativeBackground from '../GenerativeBackground'
@@ -50,14 +50,16 @@ const RegisterForm = () => {
 				password: userData.password,
 			})
 
-			const token = response.data?.token
-			if (!token) {
-				setServerError('Токен не получен от сервера')
+			const accessToken = response.data?.accessToken
+			const refreshToken = response.data?.refreshToken
+			if (!accessToken || !refreshToken) {
+				setServerError('Токены не получены от сервера')
 				setIsLoading(false)
 				return
 			}
 
-			saveAuthToken(token)
+			saveAuthToken(accessToken)
+			saveRefreshToken(refreshToken)
 			navigate('/', { replace: true })
 		} catch (error) {
 			console.error('Ошибка при регистрации:', error)

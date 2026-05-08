@@ -1,5 +1,6 @@
 //ЗАМЕНИТЬ
 export const AUTH_TOKEN_KEY = 'sketchroom_token'
+export const REFRESH_TOKEN_KEY = 'sketchroom_refresh_token'
 
 export interface AuthUser {
 	userId: string
@@ -37,6 +38,23 @@ export const getAuthToken = () => {
 
 export const clearAuthToken = () => {
 	localStorage.removeItem(AUTH_TOKEN_KEY)
+}
+
+export const saveRefreshToken = (token: string) => {
+	localStorage.setItem(REFRESH_TOKEN_KEY, token)
+}
+
+export const getRefreshToken = () => {
+	return localStorage.getItem(REFRESH_TOKEN_KEY)
+}
+
+export const clearRefreshToken = () => {
+	localStorage.removeItem(REFRESH_TOKEN_KEY)
+}
+
+export const clearAuth = () => {
+	clearAuthToken()
+	clearRefreshToken()
 }
 
 export const getAuthUser = (): AuthUser | null => {
