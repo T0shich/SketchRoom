@@ -107,7 +107,7 @@ export const DrawingCanvas = ({
 		}
 	}
 
-	useUndoRedo()
+	useUndoRedo(socket, roomKey)
 
 
 	return (

@@ -1,12 +1,15 @@
 import type { FabricObject, Path, TPointerEventInfo } from 'fabric'
 import { useEffect } from 'react'
+import type { Socket } from 'socket.io-client'
 import { useFabric } from '../../../store/useFabric'
 import { UndoRedo } from '../Tools/UndoRedo'
 
-export const useUndoRedo = () => {
+export const useUndoRedo = (socket?: Socket | null, roomKey?: string) => {
 	const { fabricRef: fabricCanvasRef } = useFabric()
 	const { undo, redo, pushAction } = UndoRedo(
 		fabricCanvasRef || { current: null },
+		socket,
+		roomKey,
 	)
 
 	useEffect(() => {
@@ -47,7 +50,8 @@ export const useUndoRedo = () => {
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			const isZ = e.key === 'z' || e.key === 'Z'  || e.key === 'я' || e.key === 'Я' 
+			const isZ =
+				e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я'
 			const isCtrl = e.ctrlKey || e.metaKey
 
 			if (isCtrl && isZ && e.shiftKey) {
