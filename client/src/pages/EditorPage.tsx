@@ -29,6 +29,15 @@ interface RoomUsersUpdatedPayload {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket: Socket = io(API_URL)
 
+// In dev, Vite HMR can re-evaluate this module and create a new socket
+// without automatically cleaning up the previous one. That leaks connections
+// and results in a burst of "Подключился ..." on server restarts.
+if (import.meta.hot) {
+	import.meta.hot.dispose(() => {
+		socket.disconnect()
+	})
+}
+
 const EditorPage = () => {
 	const [searchParams, setSearchParams] = useSearchParams()
 	const token = getAuthToken()

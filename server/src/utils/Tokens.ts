@@ -1,7 +1,9 @@
 import crypto from 'crypto'
-import jwt from 'jsonwebtoken'
+import jwt, { type SignOptions } from 'jsonwebtoken'
+import type { StringValue } from 'ms'
 
-const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || '15m'
+const ACCESS_TOKEN_TTL: StringValue | number =
+	(process.env.ACCESS_TOKEN_TTL as StringValue | undefined) ?? '15m'
 const REFRESH_TOKEN_TTL_DAYS = Number(
 	process.env.REFRESH_TOKEN_TTL_DAYS || '30',
 )
@@ -49,13 +51,14 @@ export const refreshTokenExpiresAt = () => {
 }
 
 export const signAccessToken = (payload: Omit<AccessTokenPayload, 'type'>) => {
+	const options: SignOptions = { expiresIn: ACCESS_TOKEN_TTL }
 	return jwt.sign(
 		{
 			...payload,
 			type: 'access',
 		},
 		getJwtSecret(),
-		{ expiresIn: ACCESS_TOKEN_TTL },
+		options,
 	)
 }
 
