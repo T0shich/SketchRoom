@@ -17,6 +17,33 @@ export function RoomHandler(io: Server) {
 	io.on('connection', socket => {
 		console.log('Подключился', socket.id)
 
+		const leaveRoomInternal = (roomKeyRaw?: string) => {
+			const normalizedKey = normalizeRoomKey(roomKeyRaw ?? socket.data.roomKey)
+			if (!normalizedKey) return
+			const room = rooms.get(normalizedKey)
+			// always leave the socket.io room even if we don't have a record
+			socket.leave(normalizedKey)
+			socket.data.roomKey = undefined
+			if (!room) return
+
+			const leavingUser = room.users.find((user: User) => user.id === socket.id)
+			if (!leavingUser) {
+				emitRoomUsersUpdated(normalizedKey)
+				return
+			}
+
+			room.users = room.users.filter((user: User) => user.id !== socket.id)
+			if (leavingUser.admin && room.users.length > 0) {
+				room.users[0].admin = true
+			}
+			emitRoomUsersUpdated(normalizedKey)
+		}
+
+		socket.on('leaveRoom', (roomKey?: string) => {
+			leaveRoomInternal(roomKey)
+			socket.emit('leftRoom', { success: true })
+		})
+
 		socket.on('joinRoom', (roomKey: string) => {
 			const normalizedKey = normalizeRoomKey(roomKey)
 			if (!normalizedKey) {

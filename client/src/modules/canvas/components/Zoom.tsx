@@ -1,4 +1,4 @@
-import { Point , type TMat2D} from 'fabric'
+import { Point, type TMat2D } from 'fabric'
 import { useEffect, useState } from 'react'
 import { useFabric } from '../../../store/useFabric'
 
@@ -9,6 +9,8 @@ export const Zoom = () => {
 	useEffect(() => {
 		const canvas = fabricRef?.current
 		if (!canvas) return
+		const target = canvas.upperCanvasEl
+		if (!target) return
 
 		const handleWheel = (event: WheelEvent) => {
 			event.preventDefault()
@@ -29,23 +31,23 @@ export const Zoom = () => {
 
 			const nextViewport = [...viewport] as TMat2D
 			if (event.shiftKey) {
-       
-        nextViewport[4] -= event.deltaY
-      } else {
-      
-        nextViewport[4] -= event.deltaX
-        nextViewport[5] -= event.deltaY
-      }
+
+				nextViewport[4] -= event.deltaY
+			} else {
+
+				nextViewport[4] -= event.deltaX
+				nextViewport[5] -= event.deltaY
+			}
 			canvas.setViewportTransform(nextViewport)
 			canvas.requestRenderAll()
 		}
 
-		canvas.upperCanvasEl.addEventListener('wheel', handleWheel, {
+		target.addEventListener('wheel', handleWheel, {
 			passive: false,
 		})
 
 		return () => {
-			canvas.upperCanvasEl.removeEventListener('wheel', handleWheel)
+			target.removeEventListener('wheel', handleWheel)
 		}
 	}, [fabricRef])
 

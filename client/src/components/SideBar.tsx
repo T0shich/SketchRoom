@@ -47,10 +47,11 @@ const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
 		if (!roomKey) return
 
 		const handleRoomUsersUpdated = (payload: RoomUsersUpdatedPayload) => {
-			if (payload.roomKey !== roomKey) return
+			const normalizedLocalKey = roomKey.toUpperCase()
+			if (payload.roomKey !== normalizedLocalKey) return
 
 			setData((prev) => ({
-				roomKey: prev?.roomKey || roomKey,
+				roomKey: prev?.roomKey || normalizedLocalKey,
 				users: payload.users,
 			}))
 		}
@@ -79,7 +80,7 @@ const SideBar = ({ roomKey, socket, currentUserEmail }: SideBarProps) => {
                 truncate whitespace-nowrap text-center
                 ${user?.admin ? 'bg-yellow-100 text-gray-700' : 'bg-slate-100 text-gray-700'}
               `}
-							title={user.id.slice(0, 10)} 
+							title={user.id.slice(0, 10)}
 						>
 							{isActive ? user.id.slice(0, 10) : user.id[0]}
 						</li>

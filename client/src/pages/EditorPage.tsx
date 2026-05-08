@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import SideBar from '../components/SideBar'
@@ -19,7 +19,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket: Socket = io(API_URL)
 
 const EditorPage = () => {
-	const [searchParams] = useSearchParams()
+	const [searchParams, setSearchParams] = useSearchParams()
 	const token = getAuthToken()
 	const user = getAuthUser()
 	const authenticated = Boolean(token && user)
@@ -37,6 +37,29 @@ const EditorPage = () => {
 	const [isSaving, setIsSaving] = useState(false)
 	const [saveStatus, setSaveStatus] = useState('')
 	const [boardError, setBoardError] = useState('')
+	const previousActiveRoomKeyRef = useRef<string | null>(null)
+	const activeRoomKey = (board?.roomKey ?? roomKey)?.toUpperCase() ?? null
+
+	// Normalize /editor URL params to avoid mixed/invalid states:
+	// boardId > roomKey > mode(create|join)
+	useEffect(() => {
+		const currentMode = searchParams.get('mode')
+		const currentBoardId = searchParams.get('boardId')
+		const currentRoomKey = searchParams.get('roomKey')
+
+		const next = new URLSearchParams()
+		if (currentBoardId) {
+			next.set('boardId', currentBoardId)
+		} else if (currentRoomKey) {
+			next.set('roomKey', currentRoomKey.toUpperCase())
+		} else if (currentMode === 'create' || currentMode === 'join') {
+			next.set('mode', currentMode)
+		}
+
+		if (next.toString() !== searchParams.toString()) {
+			setSearchParams(next, { replace: true })
+		}
+	}, [searchParams, setSearchParams])
 
 	useEffect(() => {
 		const handleConnect = () => {
@@ -48,12 +71,37 @@ const EditorPage = () => {
 			setIsConnecting(false)
 			setSocketId('')
 			setRoomKey(null)
+			try {
+				const current = new URLSearchParams(window.location.search)
+				// keep boardId if present, otherwise just drop roomKey
+				if (current.get('boardId')) {
+					setSearchParams({ boardId: String(current.get('boardId')) }, { replace: true })
+				} else {
+					current.delete('roomKey')
+					setSearchParams(current, { replace: true })
+				}
+			} catch {
+				// ignore
+			}
 		}
 
 		const handleJoinedRoom = (response: JoinedRoomResponse) => {
 			if (response.success && response.roomKey) {
 				setRoomKey(response.roomKey)
 				setJoinError('')
+				try {
+					const current = new URLSearchParams(window.location.search)
+					const currentBoardId = current.get('boardId')
+					if (currentBoardId) {
+						// canonical board route stays boardId-only
+						setSearchParams({ boardId: currentBoardId }, { replace: true })
+					} else {
+						// canonical room route: roomKey-only
+						setSearchParams({ roomKey: response.roomKey }, { replace: true })
+					}
+				} catch {
+					// ignore
+				}
 				return
 			}
 
@@ -76,9 +124,55 @@ const EditorPage = () => {
 	}, [])
 
 	useEffect(() => {
-		if (!board?.roomKey || !socket.connected) return
+		if (!board?.roomKey || !isConnecting) return
 		socket.emit('joinRoom', board.roomKey)
-	}, [board?.roomKey])
+	}, [board?.roomKey, isConnecting])
+
+	// Keep local roomKey state aligned with URL when not in board mode
+	useEffect(() => {
+		const currentBoardId = searchParams.get('boardId')
+		if (currentBoardId) return
+		const paramRoomKey = searchParams.get('roomKey')
+		if (!paramRoomKey) {
+			setRoomKey(null)
+			return
+		}
+		if (roomKey !== paramRoomKey) {
+			setRoomKey(paramRoomKey)
+		}
+	}, [searchParams, roomKey])
+
+	// Notify server on room change/leave without disconnecting the socket (SPA navigation/back)
+	useEffect(() => {
+		if (!isConnecting) {
+			previousActiveRoomKeyRef.current = activeRoomKey
+			return
+		}
+
+		const previousActiveRoomKey = previousActiveRoomKeyRef.current
+		if (previousActiveRoomKey && previousActiveRoomKey !== activeRoomKey) {
+			socket.emit('leaveRoom', previousActiveRoomKey)
+		}
+		previousActiveRoomKeyRef.current = activeRoomKey
+	}, [activeRoomKey, isConnecting])
+
+	useEffect(() => {
+		return () => {
+			const previousActiveRoomKey = previousActiveRoomKeyRef.current
+			if (previousActiveRoomKey && socket.connected) {
+				socket.emit('leaveRoom', previousActiveRoomKey)
+			}
+		}
+	}, [])
+
+	// Auto-join when URL contains roomKey (helps browser back/forward behavior)
+	useEffect(() => {
+		const paramRoomKey = searchParams.get('roomKey')
+		if (!paramRoomKey) return
+		if (isConnecting) {
+			socket.emit('joinRoom', paramRoomKey)
+		}
+	}, [searchParams, isConnecting])
 
 	useEffect(() => {
 		if (!authenticated || !token || !boardId) {
@@ -92,10 +186,9 @@ const EditorPage = () => {
 
 		void BoardAPI.getBoardById(boardId)
 			.then(boardData => {
-				setBoard(boardData)
-				if (socket.connected) {
-					socket.emit('joinRoom', boardData.roomKey)
-				}
+				const normalizedRoomKey = boardData.roomKey?.toUpperCase()
+				setBoard({ ...boardData, roomKey: normalizedRoomKey })
+				setRoomKey(normalizedRoomKey)
 			})
 			.catch(() => {
 				setBoard(null)
@@ -181,7 +274,7 @@ const EditorPage = () => {
 		)
 	}
 
-	if (!roomKey && !boardId) {
+	if (!activeRoomKey && !boardId) {
 		return (
 			<div className='flex min-h-screen items-center justify-center bg-slate-100 p-6'>
 				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
@@ -200,7 +293,7 @@ const EditorPage = () => {
 		)
 	}
 
-	if (!roomKey && boardId) {
+	if (!activeRoomKey && boardId) {
 		return (
 			<div className='flex min-h-screen items-center justify-center bg-slate-100 p-6'>
 				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
@@ -218,11 +311,11 @@ const EditorPage = () => {
 	return (
 		<Layout>
 			<div className='flex h-full w-full'>
-				<SideBar roomKey={roomKey} socket={socket} currentUserEmail={user.email} />
+				<SideBar roomKey={activeRoomKey} socket={socket} currentUserEmail={user.email} />
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>
-							{board?.title ? `${board.title} • ` : ''}Комната {roomKey}
+							{board?.title ? `${board.title} • ` : ''}Комната {activeRoomKey}
 						</div>
 						<div className='text-xs text-slate-500'>Аккаунт: {user.email}</div>
 						<div className='flex items-center gap-3'>
@@ -243,7 +336,7 @@ const EditorPage = () => {
 						</div>
 					</div>
 					<div className='min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
-						<DrawingCanvas socket={socket} roomKey={roomKey ?? ''} initialSnapshot={board?.snapshot || null} />
+						<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} />
 					</div>
 				</main>
 			</div>
