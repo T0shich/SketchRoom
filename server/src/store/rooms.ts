@@ -9,6 +9,7 @@ export const createRoomRecord = (forcedKey?: string) => {
 		key,
 		createdAt: new Date(),
 		users: [],
+		joinRequests: [],
 		canvasObjects: [],
 	}
 

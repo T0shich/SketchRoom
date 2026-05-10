@@ -4,10 +4,16 @@ export interface User {
 	admin?: boolean
 }
 
+export interface JoinRequest {
+	id: string
+	name?: string
+}
+
 export interface Room {
 	key: string
 	createdAt: Date
 	users: User[]
+	joinRequests: JoinRequest[]
 	canvasObjects: unknown[]
 }
 

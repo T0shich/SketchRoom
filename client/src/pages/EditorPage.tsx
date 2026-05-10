@@ -13,6 +13,8 @@ interface JoinedRoomResponse {
 	success: boolean
 	roomKey: string
 	message?: string
+	users?: RoomUser[]
+	joinRequests?: JoinRequest[]
 }
 
 interface RoomUser {
@@ -24,6 +26,16 @@ interface RoomUser {
 interface RoomUsersUpdatedPayload {
 	roomKey: string
 	users: RoomUser[]
+}
+
+interface JoinRequest {
+	id: string
+	name?: string
+}
+
+interface RoomJoinRequestsUpdatedPayload {
+	roomKey: string
+	requests: JoinRequest[]
 }
 
 interface KickedFromRoomPayload {
@@ -58,12 +70,16 @@ const EditorPage = () => {
 	const [roomKey, setRoomKey] = useState<string | null>(null)
 	const [joinError, setJoinError] = useState<string>('')
 	const [roomUsers, setRoomUsers] = useState<RoomUser[]>([])
+	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([])
+	const [joinRequestError, setJoinRequestError] = useState('')
+	const [pendingJoinRequestIds, setPendingJoinRequestIds] = useState<string[]>([])
 	const [board, setBoard] = useState<Board | null>(null)
 	const [isBoardLoading, setIsBoardLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [saveStatus, setSaveStatus] = useState('')
 	const [boardError, setBoardError] = useState('')
 	const previousActiveRoomKeyRef = useRef<string | null>(null)
+	const previousUrlRoomKeyRef = useRef<string | null>(null)
 	const activeRoomKey = (board?.roomKey ?? roomKey)?.toUpperCase() ?? null
 	const isRoomAdmin = Boolean(
 		activeRoomKey && roomUsers.find(u => u.id === socketId)?.admin,
@@ -116,8 +132,16 @@ const EditorPage = () => {
 
 		const handleJoinedRoom = (response: JoinedRoomResponse) => {
 			if (response.success && response.roomKey) {
-				setRoomKey(response.roomKey)
 				setJoinError('')
+				if (Array.isArray(response.users)) {
+					setRoomUsers(response.users)
+				}
+				if (Array.isArray(response.joinRequests)) {
+					setJoinRequests(response.joinRequests)
+				}
+
+				// Update URL first to avoid a transient state where roomKey is set
+				// but URL still doesn't contain `roomKey` (which could trigger a leave).
 				try {
 					const current = new URLSearchParams(window.location.search)
 					const currentBoardId = current.get('boardId')
@@ -130,6 +154,14 @@ const EditorPage = () => {
 					}
 				} catch {
 					// ignore
+				}
+
+				setRoomKey(response.roomKey)
+
+				// Ensure we fetch the current canvas state after we are actually joined.
+				// This is important for the approve-join flow (user may not have requested state yet).
+				if (socket.connected) {
+					socket.emit('requestCanvasState', response.roomKey)
 				}
 				return
 			}
@@ -172,6 +204,24 @@ const EditorPage = () => {
 
 	useEffect(() => {
 		if (!activeRoomKey) {
+			setJoinRequests([])
+			return
+		}
+
+		const handleJoinRequestsUpdated = (payload: RoomJoinRequestsUpdatedPayload) => {
+			if (!payload?.roomKey) return
+			if (payload.roomKey.toUpperCase() !== activeRoomKey) return
+			setJoinRequests(Array.isArray(payload.requests) ? payload.requests : [])
+		}
+
+		socket.on('roomJoinRequestsUpdated', handleJoinRequestsUpdated)
+		return () => {
+			socket.off('roomJoinRequestsUpdated', handleJoinRequestsUpdated)
+		}
+	}, [activeRoomKey])
+
+	useEffect(() => {
+		if (!activeRoomKey) {
 			setRoomUsers([])
 			return
 		}
@@ -194,13 +244,20 @@ const EditorPage = () => {
 		socket.emit('joinRoom', { roomKey: board.roomKey, userName })
 	}, [board?.roomKey, isConnecting])
 
-	// Keep local roomKey state aligned with URL when not in board mode
+	// Keep local roomKey state aligned with URL when not in board mode.
+	// Important: only clear local roomKey when URL *explicitly* navigates away from a room.
+	// Otherwise we can end up leaving right after a successful join approval.
 	useEffect(() => {
 		const currentBoardId = searchParams.get('boardId')
 		if (currentBoardId) return
 		const paramRoomKey = searchParams.get('roomKey')
+		const previousUrlRoomKey = previousUrlRoomKeyRef.current
+		previousUrlRoomKeyRef.current = paramRoomKey
 		if (!paramRoomKey) {
-			setRoomKey(null)
+			// Only clear if URL used to have a roomKey (i.e. user navigated away).
+			if (previousUrlRoomKey) {
+				setRoomKey(null)
+			}
 			return
 		}
 		if (roomKey !== paramRoomKey) {
@@ -235,11 +292,12 @@ const EditorPage = () => {
 	useEffect(() => {
 		const paramRoomKey = searchParams.get('roomKey')
 		if (!paramRoomKey) return
+		if (roomKey && roomKey.toUpperCase() === paramRoomKey.toUpperCase()) return
 		if (isConnecting) {
 			const userName = user?.name || user?.email
 			socket.emit('joinRoom', { roomKey: paramRoomKey, userName })
 		}
-	}, [searchParams, isConnecting])
+	}, [searchParams, isConnecting, roomKey, user])
 
 	useEffect(() => {
 		if (!authenticated || !token || !boardId) {
@@ -277,6 +335,48 @@ const EditorPage = () => {
 
 		const userName = user?.name || user?.email
 		socket.emit('joinRoom', { roomKey: upperKey, userName })
+	}
+
+	const handleApproveJoinRequest = (userId: string) => {
+		if (!activeRoomKey) return
+		if (!socket.connected) {
+			setJoinRequestError('Нет соединения с сервером')
+			return
+		}
+		if (pendingJoinRequestIds.includes(userId)) return
+		setJoinRequestError('')
+		setPendingJoinRequestIds(prev => (prev.includes(userId) ? prev : [...prev, userId]))
+		socket.emit(
+			'approveJoinRequest',
+			{ roomKey: activeRoomKey, userId },
+			(res?: { success: boolean; message?: string }) => {
+				setPendingJoinRequestIds(prev => prev.filter(id => id !== userId))
+				if (!res?.success) {
+					setJoinRequestError(res?.message || 'Не удалось подтвердить заявку')
+				}
+			},
+		)
+	}
+
+	const handleDenyJoinRequest = (userId: string) => {
+		if (!activeRoomKey) return
+		if (!socket.connected) {
+			setJoinRequestError('Нет соединения с сервером')
+			return
+		}
+		if (pendingJoinRequestIds.includes(userId)) return
+		setJoinRequestError('')
+		setPendingJoinRequestIds(prev => (prev.includes(userId) ? prev : [...prev, userId]))
+		socket.emit(
+			'denyJoinRequest',
+			{ roomKey: activeRoomKey, userId },
+			(res?: { success: boolean; message?: string }) => {
+				setPendingJoinRequestIds(prev => prev.filter(id => id !== userId))
+				if (!res?.success) {
+					setJoinRequestError(res?.message || 'Не удалось отклонить заявку')
+				}
+			},
+		)
 	}
 
 	const saveBoardSnapshot = async () => {
@@ -379,7 +479,7 @@ const EditorPage = () => {
 	return (
 		<Layout>
 			<div className='flex h-full w-full'>
-				<SideBar roomKey={activeRoomKey} socket={socket} socketId={socketId} currentUserEmail={user.email} />
+				<SideBar roomKey={activeRoomKey} socket={socket} socketId={socketId} currentUserEmail={user.email} users={roomUsers} />
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>
@@ -407,7 +507,48 @@ const EditorPage = () => {
 						</div>
 					</div>
 					<div className='min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
-						<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} canClear={isRoomAdmin} />
+						<div className='relative h-full w-full'>
+							<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} canClear={isRoomAdmin} />
+							{isRoomAdmin && joinRequests.length > 0 && (
+								<div className='pointer-events-none absolute right-4 top-4 z-20 flex w-80 flex-col gap-3'>
+									{joinRequests.map((req) => {
+										const isPending = pendingJoinRequestIds.includes(req.id)
+										const displayName = (req.name || req.id).trim()
+										return (
+											<div key={req.id} className='pointer-events-auto rounded-xl border border-slate-200 bg-white p-3 shadow-sm'>
+												<div className='mb-1 text-xs font-semibold tracking-[0.12em] text-slate-400'>ЗАПРОС НА ВХОД</div>
+												<div className='mb-3 truncate text-sm font-medium text-slate-800' title={displayName}>
+													{displayName}
+												</div>
+												<div className='flex items-center gap-2'>
+													<button
+														type='button'
+														onClick={() => handleApproveJoinRequest(req.id)}
+														disabled={isPending}
+														className='rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+													>
+														{isPending ? '...' : 'Подтвердить'}
+													</button>
+													<button
+														type='button'
+														onClick={() => handleDenyJoinRequest(req.id)}
+														disabled={isPending}
+														className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+													>
+														Отклонить
+													</button>
+												</div>
+											</div>
+									)
+									})}
+									{joinRequestError && (
+										<div className='pointer-events-auto rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-500'>
+											{joinRequestError}
+										</div>
+									)}
+								</div>
+							)}
+						</div>
 					</div>
 				</main>
 			</div>
