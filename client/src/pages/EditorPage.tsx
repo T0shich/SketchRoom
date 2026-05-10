@@ -107,6 +107,16 @@ const EditorPage = () => {
 	}, [searchParams, setSearchParams])
 
 	useEffect(() => {
+		if(isSaving){
+			setSaveStatus('Сохранение...')
+		}
+		let timer = setTimeout(() => {
+				setSaveStatus('')
+		}, 3000)
+			return () => clearTimeout(timer)
+	},[isSaving , saveStatus])
+
+	useEffect(() => {
 		const handleConnect = () => {
 			setIsConnecting(true)
 			setSocketId(socket.id || '')
