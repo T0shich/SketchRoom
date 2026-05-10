@@ -4,6 +4,24 @@ import { User } from '../types/Types'
 import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 
 export function RoomHandler(io: Server) {
+	const removeUserFromRoomRecord = (
+		roomKey: string,
+		targetSocketId: string,
+	) => {
+		const room = rooms.get(roomKey)
+		if (!room) return
+
+		const leavingUser = room.users.find(
+			(user: User) => user.id === targetSocketId,
+		)
+		if (!leavingUser) return
+
+		room.users = room.users.filter((user: User) => user.id !== targetSocketId)
+		if (leavingUser.admin && room.users.length > 0) {
+			room.users[0].admin = true
+		}
+	}
+
 	const emitRoomUsersUpdated = (roomKey: string) => {
 		const room = rooms.get(roomKey)
 		if (!room) return
@@ -26,16 +44,7 @@ export function RoomHandler(io: Server) {
 			socket.data.roomKey = undefined
 			if (!room) return
 
-			const leavingUser = room.users.find((user: User) => user.id === socket.id)
-			if (!leavingUser) {
-				emitRoomUsersUpdated(normalizedKey)
-				return
-			}
-
-			room.users = room.users.filter((user: User) => user.id !== socket.id)
-			if (leavingUser.admin && room.users.length > 0) {
-				room.users[0].admin = true
-			}
+			removeUserFromRoomRecord(normalizedKey, socket.id)
 			emitRoomUsersUpdated(normalizedKey)
 		}
 
@@ -117,6 +126,79 @@ export function RoomHandler(io: Server) {
 			},
 		)
 
+		socket.on(
+			'kickUser',
+			(
+				payload: { roomKey?: string; userId?: string },
+				ack?: (res: { success: boolean; message?: string }) => void,
+			) => {
+				const normalizedKey = normalizeRoomKey(
+					payload?.roomKey ?? socket.data.roomKey,
+				)
+				if (!normalizedKey) {
+					ack?.({ success: false, message: 'Некорректный ключ комнаты' })
+					return
+				}
+				const room = rooms.get(normalizedKey)
+				if (!room) {
+					ack?.({ success: false, message: 'Комната не найдена' })
+					return
+				}
+				if (
+					socket.data.roomKey !== normalizedKey ||
+					!socket.rooms.has(normalizedKey)
+				) {
+					ack?.({ success: false, message: 'Вы не в этой комнате' })
+					return
+				}
+
+				const requester = room.users.find((u: User) => u.id === socket.id)
+				if (!requester?.admin) {
+					ack?.({
+						success: false,
+						message: 'Только админ комнаты может удалять пользователей',
+					})
+					return
+				}
+
+				const targetUserId =
+					typeof payload?.userId === 'string' ? payload.userId : ''
+				if (!targetUserId) {
+					ack?.({ success: false, message: 'Некорректный пользователь' })
+					return
+				}
+				if (targetUserId === socket.id) {
+					ack?.({ success: false, message: 'Нельзя удалить самого себя' })
+					return
+				}
+
+				const existsInRoom = room.users.some((u: User) => u.id === targetUserId)
+				if (!existsInRoom) {
+					ack?.({ success: false, message: 'Пользователь не найден в комнате' })
+					return
+				}
+
+				// Update room record first
+				removeUserFromRoomRecord(normalizedKey, targetUserId)
+				emitRoomUsersUpdated(normalizedKey)
+
+				// If socket is still connected, force it to leave and notify
+				const targetSocket = io.sockets.sockets.get(targetUserId)
+				if (targetSocket) {
+					targetSocket.leave(normalizedKey)
+					if (targetSocket.data.roomKey === normalizedKey) {
+						targetSocket.data.roomKey = undefined
+					}
+					targetSocket.emit('kickedFromRoom', {
+						roomKey: normalizedKey,
+						message: 'Вас удалили из комнаты',
+					})
+				}
+
+				ack?.({ success: true })
+			},
+		)
+
 		socket.on('disconnect', () => {
 			for (const [roomKey, room] of rooms.entries()) {
 				const leavingUser = room.users.find(
@@ -124,12 +206,7 @@ export function RoomHandler(io: Server) {
 				)
 				if (!leavingUser) continue
 
-				room.users = room.users.filter((user: User) => user.id !== socket.id)
-
-				// передать права администратора следующему пользователю
-				if (leavingUser.admin && room.users.length > 0) {
-					room.users[0].admin = true
-				}
+				removeUserFromRoomRecord(roomKey, socket.id)
 
 				emitRoomUsersUpdated(roomKey)
 			}

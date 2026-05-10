@@ -26,6 +26,11 @@ interface RoomUsersUpdatedPayload {
 	users: RoomUser[]
 }
 
+interface KickedFromRoomPayload {
+	roomKey: string
+	message?: string
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket: Socket = io(API_URL)
 
@@ -135,6 +140,23 @@ const EditorPage = () => {
 		socket.on('connect', handleConnect)
 		socket.on('disconnect', handleDisconnect)
 		socket.on('joinedRoom', handleJoinedRoom)
+		socket.on('kickedFromRoom', (payload: KickedFromRoomPayload) => {
+			if (!payload?.roomKey) return
+			const kickedRoomKey = payload.roomKey.toUpperCase()
+			setJoinError(payload.message || 'Вас удалили из комнаты')
+			setRoomUsers([])
+
+			// In direct room mode (no boardId), return user to join/create screen.
+			const current = new URLSearchParams(window.location.search)
+			if (!current.get('boardId')) {
+				setRoomKey(null)
+				setSearchParams({ mode: 'join' }, { replace: true })
+			}
+
+			if (socket.connected) {
+				socket.emit('leaveRoom', kickedRoomKey)
+			}
+		})
 
 		if (socket.connected) {
 			handleConnect()
@@ -144,6 +166,7 @@ const EditorPage = () => {
 			socket.off('connect', handleConnect)
 			socket.off('disconnect', handleDisconnect)
 			socket.off('joinedRoom', handleJoinedRoom)
+			socket.off('kickedFromRoom')
 		}
 	}, [])
 
@@ -356,13 +379,16 @@ const EditorPage = () => {
 	return (
 		<Layout>
 			<div className='flex h-full w-full'>
-				<SideBar roomKey={activeRoomKey} socket={socket} currentUserEmail={user.email} />
+				<SideBar roomKey={activeRoomKey} socket={socket} socketId={socketId} currentUserEmail={user.email} />
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>
 							{board?.title ? `${board.title} • ` : ''}Комната {activeRoomKey}
 						</div>
 						<div className='text-xs text-slate-500'>Аккаунт: {user.email}</div>
+						{joinError && (
+							<div className='text-xs text-rose-500'>{joinError}</div>
+						)}
 						<div className='flex items-center gap-3'>
 							{board?.id && (
 								<>
