@@ -3,14 +3,14 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 COPY tsconfig.json ./
+RUN npm ci
 COPY prisma ./prisma
+RUN npx prisma generate
 COPY src ./src
 
-RUN npm ci
-RUN npx prisma generate
 RUN npm run build
 
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
