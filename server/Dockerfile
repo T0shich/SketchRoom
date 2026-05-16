@@ -7,8 +7,8 @@ COPY prisma ./prisma
 COPY src ./src
 
 RUN npm ci
-RUN npm run build
 RUN npx prisma generate
+RUN npm run build
 
 FROM node:18-alpine AS runner
 WORKDIR /app
