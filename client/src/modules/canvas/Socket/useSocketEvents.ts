@@ -5,6 +5,7 @@ import { ensureSocketObjectId, getSocketObjectId } from './FabrickObjects'
 interface SocketEventsProps {
 	fabricCanvasRef: RefObject<Canvas | null>
 	socket: Socket | null
+	roomKey?: string
 }
 
 type SocketObjectData = Record<string, unknown> & { socketObjectId?: string }
@@ -12,6 +13,7 @@ type SocketObjectData = Record<string, unknown> & { socketObjectId?: string }
 export const useSocketEvents = ({
 	fabricCanvasRef,
 	socket,
+	roomKey,
 }: SocketEventsProps) => {
 	useEffect(() => {
 		if (!socket || !fabricCanvasRef.current) return
@@ -95,16 +97,44 @@ export const useSocketEvents = ({
 			canvas.renderAll()
 		}
 
+		// Загружает начальное состояние холста для новых пользователей
+		const handleLoadState = (data: { objects: SocketObjectData[] }) => {
+			if (!data?.objects || !Array.isArray(data.objects)) return
+
+			util.enlivenObjects(data.objects).then(objects => {
+				const canvas = fabricCanvasRef.current
+				if (!canvas) return
+
+				// Очищаем холст перед загрузкой
+				canvas.getObjects().forEach(obj => canvas.remove(obj))
+
+				objects.forEach(obj => {
+					if (obj instanceof FabricObject) {
+						ensureSocketObjectId(obj)
+						canvas.add(obj)
+					}
+				})
+				canvas.renderAll()
+			})
+		}
+
 		socket.on('object:added_s', handleAdded)
 		socket.on('object:modified_s', handleModified)
 		socket.on('canvas:clear_s', handleClear)
 		socket.on('object:removed_s', handleRemoved)
+		socket.on('canvas:loadState', handleLoadState)
+
+		// После регистрации обработчиков просим сервер прислать текущее состояние холста
+		if (roomKey) {
+			socket.emit('requestCanvasState', roomKey)
+		}
 
 		return () => {
 			socket.off('object:removed_s', handleRemoved)
 			socket.off('object:added_s', handleAdded)
 			socket.off('object:modified_s', handleModified)
 			socket.off('canvas:clear_s', handleClear)
+			socket.off('canvas:loadState', handleLoadState)
 		}
-	}, [socket, fabricCanvasRef])
+	}, [socket, fabricCanvasRef, roomKey])
 }

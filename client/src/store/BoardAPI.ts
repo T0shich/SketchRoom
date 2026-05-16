@@ -1,9 +1,4 @@
-import axios from 'axios'
-import { getAuthToken } from './Auth'
-
-const getHeaders = () => ({
-	Authorization: `Bearer ${getAuthToken()}`,
-})
+import { api } from './api'
 
 interface CanvasSnapshot {
 	version: string
@@ -26,34 +21,24 @@ interface Board {
 	updatedAt: string
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-
 export const BoardAPI = {
 	getBoards: async (): Promise<Board[]> => {
-		const res = await axios.get(`${API_URL}/boards`, { headers: getHeaders() })
+		const res = await api.get(`/boards`)
 		return res.data.boards
 	},
 
 	getBoardById: async (id: string): Promise<Board> => {
-		const res = await axios.get(`${API_URL}/boards/${id}`, {
-			headers: getHeaders(),
-		})
+		const res = await api.get(`/boards/${id}`)
 		return res.data.board
 	},
 
 	getBoardByRoomKey: async (roomKey: string): Promise<Board> => {
-		const res = await axios.get(`${API_URL}/boards/room/${roomKey}`, {
-			headers: getHeaders(),
-		})
+		const res = await api.get(`/boards/room/${roomKey}`)
 		return res.data.board
 	},
 
 	createBoard: async (title: string, roomKey: string): Promise<Board> => {
-		const res = await axios.post(
-			`${API_URL}/boards`,
-			{ title, roomKey },
-			{ headers: getHeaders() },
-		)
+		const res = await api.post(`/boards`, { title, roomKey })
 		return res.data.board
 	},
 
@@ -61,15 +46,11 @@ export const BoardAPI = {
 		id: string,
 		snapshot: CanvasSnapshot,
 	): Promise<void> => {
-		await axios.put(
-			`${API_URL}/boards/${id}/snapshot`,
-			{ snapshot },
-			{ headers: getHeaders() },
-		)
+		await api.put(`/boards/${id}/snapshot`, { snapshot })
 	},
 
 	deleteBoard: async (id: string): Promise<void> => {
-		await axios.delete(`${API_URL}/boards/${id}`, { headers: getHeaders() })
+		await api.delete(`/boards/${id}`)
 	},
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Socket } from 'socket.io-client'
 import type { CanvasSnapshot } from '../../../store/BoardAPI'
 import { useCanvasInit } from '../hooks/useCanvasInit'
@@ -19,6 +19,7 @@ interface DrawingCanvasProps {
 	socket: Socket | null
 	roomKey: string
 	initialSnapshot?: CanvasSnapshot | null
+	canClear?: boolean
 }
 
 const INITIAL_BRUSH_COLOR = '#111827'
@@ -29,6 +30,7 @@ export const DrawingCanvas = ({
 	socket,
 	roomKey,
 	initialSnapshot = null,
+	canClear = false,
 }: DrawingCanvasProps) => {
 	const [brushColor, setBrushColor] = useState(INITIAL_BRUSH_COLOR)
 	const [brushSize, setBrushSize] = useState(INITIAL_BRUSH_SIZE)
@@ -38,6 +40,7 @@ export const DrawingCanvas = ({
 	const [eraserSize, setEraserSize] = useState(INITIAL_ERASER_SIZE)
 	const [isDrawingMode, setIsDrawingMode] = useState(true)
 	const [isEditingMode, setIsEditingMode] = useState(false)
+	const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false)
 
 	const { fabricCanvasRef, canvasHostRef, snapshotLoadedRef } = useCanvasInit({
 		roomKey,
@@ -88,7 +91,7 @@ export const DrawingCanvas = ({
 		fabricCanvasRef,
 	})
 
-	useSocketEvents({ fabricCanvasRef, socket })
+	useSocketEvents({ fabricCanvasRef, socket, roomKey })
 
 	useSocketSync({
 		fabricCanvasRef,
@@ -97,7 +100,11 @@ export const DrawingCanvas = ({
 		isEraser,
 	})
 
-	const onClear = () => {
+	useEffect(() => {
+		setIsClearConfirmOpen(false)
+	}, [roomKey])
+
+	const performClear = () => {
 		fabricCanvasRef.current?.getObjects().forEach(obj => {
 			fabricCanvasRef.current?.remove(obj)
 		})
@@ -107,7 +114,17 @@ export const DrawingCanvas = ({
 		}
 	}
 
-	useUndoRedo()
+	const requestClear = () => {
+		if (!canClear) return
+		setIsClearConfirmOpen(true)
+	}
+
+	const confirmClear = () => {
+		setIsClearConfirmOpen(false)
+		performClear()
+	}
+
+	useUndoRedo(socket, roomKey)
 
 
 	return (
@@ -123,7 +140,8 @@ export const DrawingCanvas = ({
 				setTextMode={setTextMode}
 				eraserSize={eraserSize}
 				setEraserSize={setEraserSize}
-				onClear={onClear}
+				onClear={requestClear}
+				canClear={canClear}
 				isDrawingMode={isDrawingMode}
 				setIsDrawingMode={setIsDrawingMode}
 				isEditingMode={isEditingMode}
@@ -131,6 +149,28 @@ export const DrawingCanvas = ({
 				textSize={textSize}
 				setTextSize={setTextSize}
 			/>
+			{isClearConfirmOpen && (
+				<div className='absolute left-3 top-20 z-20 w-[260px] rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur'>
+					<div className='text-sm font-medium text-slate-900'>Очистить холст?</div>
+					<div className='mt-1 text-xs text-slate-500'>Действие удалит все объекты у всех участников.</div>
+					<div className='mt-3 flex items-center justify-end gap-2'>
+						<button
+							type='button'
+							onClick={() => setIsClearConfirmOpen(false)}
+							className='rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200'
+						>
+							Отмена
+						</button>
+						<button
+							type='button'
+							onClick={confirmClear}
+							className='rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-rose-600'
+						>
+							Очистить
+						</button>
+					</div>
+				</div>
+			)}
 			<Zoom />
 			<ViewportScroller />
 			{isEraser && eraserPos && (

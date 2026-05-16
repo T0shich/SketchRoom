@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BoardAPI, type Board as BoardItem } from '../../store/BoardAPI'
 import Board from '../../ui/Board'
+import { exportSnapshotToPng } from '../../utils/exportSnapshot'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -24,7 +25,9 @@ const BoardList = () => {
 	const [boards, setBoards] = useState<BoardItem[]>([])
 	const [isLoading, setIsLoading] = useState(true)
 	const [isCreating, setIsCreating] = useState(false)
+	const [downloadingBoardId, setDownloadingBoardId] = useState<string | null>(null)
 	const [error, setError] = useState('')
+	const [downloadError, setDownloadError] = useState('')
 
 	const fetchBoards = async () => {
 		setIsLoading(true)
@@ -60,11 +63,30 @@ const BoardList = () => {
 			}
 
 			const board = await BoardAPI.createBoard(title, roomKey)
-			navigate(`/editor?boardId=${board.id}`)
+			navigate(`/canvas?boardId=${board.id}`)
 		} catch {
 			setError('Не удалось создать доску')
 		} finally {
 			setIsCreating(false)
+		}
+	}
+
+	const handleDownloadPng = async (boardId: string, boardTitle: string) => {
+		if (downloadingBoardId === boardId) return
+		setDownloadingBoardId(boardId)
+		setDownloadError('')
+
+		try {
+			const board = await BoardAPI.getBoardById(boardId)
+			if (!board.snapshot) {
+				setDownloadError('Нет сохранённого снимка холста. Откройте доску и нажмите «Сохранить».')
+				return
+			}
+			await exportSnapshotToPng(board.snapshot, { filename: boardTitle })
+		} catch {
+			setDownloadError('Не удалось скачать PNG')
+		} finally {
+			setDownloadingBoardId(prev => (prev === boardId ? null : prev))
 		}
 	}
 
@@ -95,12 +117,18 @@ const BoardList = () => {
 									key={item.id}
 									title={item.title}
 									lastUpdated={formatDate(item.updatedAt)}
-									onOpen={() => navigate(`/editor?boardId=${item.id}`)}
+									onOpen={() => navigate(`/canvas?boardId=${item.id}`)}
+									onDownloadPng={() => handleDownloadPng(item.id, item.title)}
+									downloadDisabled={downloadingBoardId === item.id}
+									downloadLabel={downloadingBoardId === item.id ? '...' : 'PNG'}
 								/>
 							))}
 						</div>
 					)}
 					{error && <div className='mt-4 text-sm text-rose-500'>{error}</div>}
+					{downloadError && (
+						<div className='mt-3 text-sm text-rose-500'>{downloadError}</div>
+					)}
 				</div>
 			</div>
 		</div>

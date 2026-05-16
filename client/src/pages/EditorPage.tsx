@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import SideBar from '../components/SideBar'
 import { DrawingCanvas } from '../modules/canvas'
-import { Rooms } from '../modules/rooms'
 import { getAuthToken, getAuthUser } from '../store/Auth'
 import { BoardAPI, type Board, type CanvasSnapshot } from '../store/BoardAPI'
 import { useFabric } from '../store/useFabric'
@@ -13,30 +12,103 @@ interface JoinedRoomResponse {
 	success: boolean
 	roomKey: string
 	message?: string
+	users?: RoomUser[]
+	joinRequests?: JoinRequest[]
+}
+
+interface RoomUser {
+	id: string
+	name?: string
+	admin?: boolean
+}
+
+interface RoomUsersUpdatedPayload {
+	roomKey: string
+	users: RoomUser[]
+}
+
+interface JoinRequest {
+	id: string
+	name?: string
+}
+
+interface RoomJoinRequestsUpdatedPayload {
+	roomKey: string
+	requests: JoinRequest[]
+}
+
+interface KickedFromRoomPayload {
+	roomKey: string
+	message?: string
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const socket: Socket = io(API_URL)
 
+// In dev, Vite HMR can re-evaluate this module and create a new socket
+// without automatically cleaning up the previous one. That leaks connections
+// and results in a burst of "Подключился ..." on server restarts.
+if (import.meta.hot) {
+	import.meta.hot.dispose(() => {
+		socket.disconnect()
+	})
+}
+
 const EditorPage = () => {
-	const [searchParams] = useSearchParams()
+	const [searchParams, setSearchParams] = useSearchParams()
 	const token = getAuthToken()
 	const user = getAuthUser()
 	const authenticated = Boolean(token && user)
-	const modeQuery = searchParams.get('mode')
 	const boardId = searchParams.get('boardId')
-	const initialMode = modeQuery === 'join' ? 'join' : 'create'
 	const fabricRef = useFabric(state => state.fabricRef)
 
 	const [isConnecting, setIsConnecting] = useState(false)
 	const [socketId, setSocketId] = useState<string>('')
 	const [roomKey, setRoomKey] = useState<string | null>(null)
 	const [joinError, setJoinError] = useState<string>('')
+	const [roomUsers, setRoomUsers] = useState<RoomUser[]>([])
+	const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([])
+	const [joinRequestError, setJoinRequestError] = useState('')
+	const [pendingJoinRequestIds, setPendingJoinRequestIds] = useState<string[]>([])
 	const [board, setBoard] = useState<Board | null>(null)
 	const [isBoardLoading, setIsBoardLoading] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
 	const [saveStatus, setSaveStatus] = useState('')
 	const [boardError, setBoardError] = useState('')
+	const previousActiveRoomKeyRef = useRef<string | null>(null)
+	const previousUrlRoomKeyRef = useRef<string | null>(null)
+	const activeRoomKey = (board?.roomKey ?? roomKey)?.toUpperCase() ?? null
+	const isRoomAdmin = Boolean(
+		activeRoomKey && roomUsers.find(u => u.id === socketId)?.admin,
+	)
+
+	// Normalize /canvas URL params to avoid mixed/invalid states:
+	// boardId > roomKey
+	useEffect(() => {
+		const currentBoardId = searchParams.get('boardId')
+		const currentRoomKey = searchParams.get('roomKey')
+
+		const next = new URLSearchParams()
+		if (currentBoardId) {
+			next.set('boardId', currentBoardId)
+		} else if (currentRoomKey) {
+			next.set('roomKey', currentRoomKey.toUpperCase())
+		}
+
+		if (next.toString() !== searchParams.toString()) {
+			setSearchParams(next, { replace: true })
+		}
+	}, [searchParams, setSearchParams])
+
+	useEffect(() => {
+		if (isSaving) {
+			setSaveStatus('Сохранение...')
+		}
+		let timer = setTimeout(() => {
+			setSaveStatus('')
+		}, 3000)
+		return () => clearTimeout(timer)
+	}, [isSaving, saveStatus])
 
 	useEffect(() => {
 		const handleConnect = () => {
@@ -48,12 +120,53 @@ const EditorPage = () => {
 			setIsConnecting(false)
 			setSocketId('')
 			setRoomKey(null)
+			try {
+				const current = new URLSearchParams(window.location.search)
+				// keep boardId if present, otherwise just drop roomKey
+				if (current.get('boardId')) {
+					setSearchParams({ boardId: String(current.get('boardId')) }, { replace: true })
+				} else {
+					current.delete('roomKey')
+					setSearchParams(current, { replace: true })
+				}
+			} catch {
+				// ignore
+			}
 		}
 
 		const handleJoinedRoom = (response: JoinedRoomResponse) => {
 			if (response.success && response.roomKey) {
-				setRoomKey(response.roomKey)
 				setJoinError('')
+				if (Array.isArray(response.users)) {
+					setRoomUsers(response.users)
+				}
+				if (Array.isArray(response.joinRequests)) {
+					setJoinRequests(response.joinRequests)
+				}
+
+				// Update URL first to avoid a transient state where roomKey is set
+				// but URL still doesn't contain `roomKey` (which could trigger a leave).
+				try {
+					const current = new URLSearchParams(window.location.search)
+					const currentBoardId = current.get('boardId')
+					if (currentBoardId) {
+						// canonical board route stays boardId-only
+						setSearchParams({ boardId: currentBoardId }, { replace: true })
+					} else {
+						// canonical room route: roomKey-only
+						setSearchParams({ roomKey: response.roomKey }, { replace: true })
+					}
+				} catch {
+					// ignore
+				}
+
+				setRoomKey(response.roomKey)
+
+				// Ensure we fetch the current canvas state after we are actually joined.
+				// This is important for the approve-join flow (user may not have requested state yet).
+				if (socket.connected) {
+					socket.emit('requestCanvasState', response.roomKey)
+				}
 				return
 			}
 
@@ -63,6 +176,23 @@ const EditorPage = () => {
 		socket.on('connect', handleConnect)
 		socket.on('disconnect', handleDisconnect)
 		socket.on('joinedRoom', handleJoinedRoom)
+		socket.on('kickedFromRoom', (payload: KickedFromRoomPayload) => {
+			if (!payload?.roomKey) return
+			const kickedRoomKey = payload.roomKey.toUpperCase()
+			setJoinError(payload.message || 'Вас удалили из комнаты')
+			setRoomUsers([])
+
+			// In direct room mode (no boardId), return user to join/create screen.
+			const current = new URLSearchParams(window.location.search)
+			if (!current.get('boardId')) {
+				setRoomKey(null)
+				setSearchParams({ mode: 'join' }, { replace: true })
+			}
+
+			if (socket.connected) {
+				socket.emit('leaveRoom', kickedRoomKey)
+			}
+		})
 
 		if (socket.connected) {
 			handleConnect()
@@ -72,13 +202,106 @@ const EditorPage = () => {
 			socket.off('connect', handleConnect)
 			socket.off('disconnect', handleDisconnect)
 			socket.off('joinedRoom', handleJoinedRoom)
+			socket.off('kickedFromRoom')
 		}
 	}, [])
 
 	useEffect(() => {
-		if (!board?.roomKey || !socket.connected) return
-		socket.emit('joinRoom', board.roomKey)
-	}, [board?.roomKey])
+		if (!activeRoomKey) {
+			setJoinRequests([])
+			return
+		}
+
+		const handleJoinRequestsUpdated = (payload: RoomJoinRequestsUpdatedPayload) => {
+			if (!payload?.roomKey) return
+			if (payload.roomKey.toUpperCase() !== activeRoomKey) return
+			setJoinRequests(Array.isArray(payload.requests) ? payload.requests : [])
+		}
+
+		socket.on('roomJoinRequestsUpdated', handleJoinRequestsUpdated)
+		return () => {
+			socket.off('roomJoinRequestsUpdated', handleJoinRequestsUpdated)
+		}
+	}, [activeRoomKey])
+
+	useEffect(() => {
+		if (!activeRoomKey) {
+			setRoomUsers([])
+			return
+		}
+
+		const handleRoomUsersUpdated = (payload: RoomUsersUpdatedPayload) => {
+			if (!payload?.roomKey) return
+			if (payload.roomKey.toUpperCase() !== activeRoomKey) return
+			setRoomUsers(Array.isArray(payload.users) ? payload.users : [])
+		}
+
+		socket.on('roomUsersUpdated', handleRoomUsersUpdated)
+		return () => {
+			socket.off('roomUsersUpdated', handleRoomUsersUpdated)
+		}
+	}, [activeRoomKey])
+
+	useEffect(() => {
+		if (!board?.roomKey || !isConnecting) return
+		const userName = user?.name || user?.email
+		socket.emit('joinRoom', { roomKey: board.roomKey, userName })
+	}, [board?.roomKey, isConnecting])
+
+	// Keep local roomKey state aligned with URL when not in board mode.
+	// Important: only clear local roomKey when URL *explicitly* navigates away from a room.
+	// Otherwise we can end up leaving right after a successful join approval.
+	useEffect(() => {
+		const currentBoardId = searchParams.get('boardId')
+		if (currentBoardId) return
+		const paramRoomKey = searchParams.get('roomKey')
+		const previousUrlRoomKey = previousUrlRoomKeyRef.current
+		previousUrlRoomKeyRef.current = paramRoomKey
+		if (!paramRoomKey) {
+			// Only clear if URL used to have a roomKey (i.e. user navigated away).
+			if (previousUrlRoomKey) {
+				setRoomKey(null)
+			}
+			return
+		}
+		if (roomKey !== paramRoomKey) {
+			setRoomKey(paramRoomKey)
+		}
+	}, [searchParams, roomKey])
+
+	// Notify server on room change/leave without disconnecting the socket (SPA navigation/back)
+	useEffect(() => {
+		if (!isConnecting) {
+			previousActiveRoomKeyRef.current = activeRoomKey
+			return
+		}
+
+		const previousActiveRoomKey = previousActiveRoomKeyRef.current
+		if (previousActiveRoomKey && previousActiveRoomKey !== activeRoomKey) {
+			socket.emit('leaveRoom', previousActiveRoomKey)
+		}
+		previousActiveRoomKeyRef.current = activeRoomKey
+	}, [activeRoomKey, isConnecting])
+
+	useEffect(() => {
+		return () => {
+			const previousActiveRoomKey = previousActiveRoomKeyRef.current
+			if (previousActiveRoomKey && socket.connected) {
+				socket.emit('leaveRoom', previousActiveRoomKey)
+			}
+		}
+	}, [])
+
+	// Auto-join when URL contains roomKey (helps browser back/forward behavior)
+	useEffect(() => {
+		const paramRoomKey = searchParams.get('roomKey')
+		if (!paramRoomKey) return
+		if (roomKey && roomKey.toUpperCase() === paramRoomKey.toUpperCase()) return
+		if (isConnecting) {
+			const userName = user?.name || user?.email
+			socket.emit('joinRoom', { roomKey: paramRoomKey, userName })
+		}
+	}, [searchParams, isConnecting, roomKey, user])
 
 	useEffect(() => {
 		if (!authenticated || !token || !boardId) {
@@ -92,10 +315,9 @@ const EditorPage = () => {
 
 		void BoardAPI.getBoardById(boardId)
 			.then(boardData => {
-				setBoard(boardData)
-				if (socket.connected) {
-					socket.emit('joinRoom', boardData.roomKey)
-				}
+				const normalizedRoomKey = boardData.roomKey?.toUpperCase()
+				setBoard({ ...boardData, roomKey: normalizedRoomKey })
+				setRoomKey(normalizedRoomKey)
 			})
 			.catch(() => {
 				setBoard(null)
@@ -106,16 +328,46 @@ const EditorPage = () => {
 			})
 	}, [authenticated, token, boardId])
 
-	const handleJoinRoom = (key: string) => {
-		const upperKey = key.toUpperCase()
-		setJoinError('')
-
+	const handleApproveJoinRequest = (userId: string) => {
+		if (!activeRoomKey) return
 		if (!socket.connected) {
-			setJoinError('Нет соединения с сервером')
+			setJoinRequestError('Нет соединения с сервером')
 			return
 		}
+		if (pendingJoinRequestIds.includes(userId)) return
+		setJoinRequestError('')
+		setPendingJoinRequestIds(prev => (prev.includes(userId) ? prev : [...prev, userId]))
+		socket.emit(
+			'approveJoinRequest',
+			{ roomKey: activeRoomKey, userId },
+			(res?: { success: boolean; message?: string }) => {
+				setPendingJoinRequestIds(prev => prev.filter(id => id !== userId))
+				if (!res?.success) {
+					setJoinRequestError(res?.message || 'Не удалось подтвердить заявку')
+				}
+			},
+		)
+	}
 
-		socket.emit('joinRoom', upperKey)
+	const handleDenyJoinRequest = (userId: string) => {
+		if (!activeRoomKey) return
+		if (!socket.connected) {
+			setJoinRequestError('Нет соединения с сервером')
+			return
+		}
+		if (pendingJoinRequestIds.includes(userId)) return
+		setJoinRequestError('')
+		setPendingJoinRequestIds(prev => (prev.includes(userId) ? prev : [...prev, userId]))
+		socket.emit(
+			'denyJoinRequest',
+			{ roomKey: activeRoomKey, userId },
+			(res?: { success: boolean; message?: string }) => {
+				setPendingJoinRequestIds(prev => prev.filter(id => id !== userId))
+				if (!res?.success) {
+					setJoinRequestError(res?.message || 'Не удалось отклонить заявку')
+				}
+			},
+		)
 	}
 
 	const saveBoardSnapshot = async () => {
@@ -181,26 +433,11 @@ const EditorPage = () => {
 		)
 	}
 
-	if (!roomKey && !boardId) {
-		return (
-			<div className='flex min-h-screen items-center justify-center bg-slate-100 p-6'>
-				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
-					<div className='mb-1 text-sm text-slate-500'>SketchRoom</div>
-					<h1 className='mb-4 text-2xl font-semibold text-slate-900'>Совместная доска</h1>
-					<div className='mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
-						Аккаунт: {user.email}
-					</div>
-					<div className='mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
-						{isConnecting ? `Подключено • ${socketId}` : 'Подключение к серверу...'}
-					</div>
-					<Rooms onJoinRoom={handleJoinRoom} initialMode={initialMode} />
-					{joinError && <div className='mt-3 text-sm text-rose-500'>{joinError}</div>}
-				</div>
-			</div>
-		)
+	if (!activeRoomKey && !boardId) {
+		return <Navigate to='/editor?mode=create' replace />
 	}
 
-	if (!roomKey && boardId) {
+	if (!activeRoomKey && boardId) {
 		return (
 			<div className='flex min-h-screen items-center justify-center bg-slate-100 p-6'>
 				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
@@ -218,13 +455,16 @@ const EditorPage = () => {
 	return (
 		<Layout>
 			<div className='flex h-full w-full'>
-				<SideBar roomKey={roomKey} socket={socket} currentUserEmail={user.email} />
+				<SideBar roomKey={activeRoomKey} socket={socket} socketId={socketId} currentUserEmail={user.email} users={roomUsers} />
 				<main className='flex h-full min-w-0 flex-1 flex-col gap-4 p-4'>
 					<div className='flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm'>
 						<div className='text-sm font-medium text-slate-700'>
-							{board?.title ? `${board.title} • ` : ''}Комната {roomKey}
+							{board?.title ? `${board.title} • ` : ''}Комната {activeRoomKey}
 						</div>
 						<div className='text-xs text-slate-500'>Аккаунт: {user.email}</div>
+						{joinError && (
+							<div className='text-xs text-rose-500'>{joinError}</div>
+						)}
 						<div className='flex items-center gap-3'>
 							{board?.id && (
 								<>
@@ -243,7 +483,48 @@ const EditorPage = () => {
 						</div>
 					</div>
 					<div className='min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm'>
-						<DrawingCanvas socket={socket} roomKey={roomKey ?? ''} initialSnapshot={board?.snapshot || null} />
+						<div className='relative h-full w-full'>
+							<DrawingCanvas socket={socket} roomKey={activeRoomKey ?? ''} initialSnapshot={board?.snapshot || null} canClear={isRoomAdmin} />
+							{isRoomAdmin && joinRequests.length > 0 && (
+								<div className='pointer-events-none absolute right-4 top-4 z-20 flex w-80 flex-col gap-3'>
+									{joinRequests.map((req) => {
+										const isPending = pendingJoinRequestIds.includes(req.id)
+										const displayName = (req.name || req.id).trim()
+										return (
+											<div key={req.id} className='pointer-events-auto rounded-xl border border-slate-200 bg-white p-3 shadow-sm'>
+												<div className='mb-1 text-xs font-semibold tracking-[0.12em] text-slate-400'>ЗАПРОС НА ВХОД</div>
+												<div className='mb-3 truncate text-sm font-medium text-slate-800' title={displayName}>
+													{displayName}
+												</div>
+												<div className='flex items-center gap-2'>
+													<button
+														type='button'
+														onClick={() => handleApproveJoinRequest(req.id)}
+														disabled={isPending}
+														className='rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+													>
+														{isPending ? '...' : 'Подтвердить'}
+													</button>
+													<button
+														type='button'
+														onClick={() => handleDenyJoinRequest(req.id)}
+														disabled={isPending}
+														className='rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+													>
+														Отклонить
+													</button>
+												</div>
+											</div>
+										)
+									})}
+									{joinRequestError && (
+										<div className='pointer-events-auto rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-500'>
+											{joinRequestError}
+										</div>
+									)}
+								</div>
+							)}
+						</div>
 					</div>
 				</main>
 			</div>

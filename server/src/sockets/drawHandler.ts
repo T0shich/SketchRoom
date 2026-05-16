@@ -1,7 +1,52 @@
 import { Server } from 'socket.io'
 import { rooms } from '../store/rooms'
+import { CanvasClearPayload, CanvasObjectPayload, User } from '../types/Types'
 import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
-import { CanvasObjectPayload, CanvasClearPayload } from '../types/Types'
+
+const MAX_EVENTS_PER_SECOND = {
+	added: 20,
+	modified: 60,
+	cleared: 5,
+	removed: 20,
+}
+
+type DrawLimitsRecord = {
+	added: number[]
+	modified: number[]
+	cleared: number[]
+	removed: number[]
+}
+
+const drawLimits = new Map<string, DrawLimitsRecord>()
+
+const checkRateLimit = (
+	socketId: string,
+	eventType: keyof DrawLimitsRecord,
+	maxPerSecond: number,
+) => {
+	if (!drawLimits.has(socketId)) {
+		drawLimits.set(socketId, {
+			added: [],
+			modified: [],
+			cleared: [],
+			removed: [],
+		})
+	}
+
+	const limits = drawLimits.get(socketId) as DrawLimitsRecord
+	const now = Date.now()
+
+	// Keep only timestamps from the last 1 second
+	limits[eventType] = limits[eventType].filter(ts => now - ts < 1000)
+
+	if (limits[eventType].length >= maxPerSecond) {
+		return false
+	}
+
+	limits[eventType].push(now)
+	return true
+}
+
 export function DrawHandler(io: Server) {
 	io.on('connection', socket => {
 		socket.on('object:added', (data: CanvasObjectPayload) => {
@@ -12,7 +57,42 @@ export function DrawHandler(io: Server) {
 				!socket.rooms.has(normalizedKey)
 			)
 				return
+
+			if (!checkRateLimit(socket.id, 'added', MAX_EVENTS_PER_SECOND.added)) {
+				console.warn(
+					`[SPAM PROTECTION] Socket ${socket.id} превысил лимит добавления объектов`,
+				)
+				socket.emit('error', {
+					code: 'RATE_LIMIT_EXCEEDED',
+					message: 'Слишком быстрые события добавления объектов',
+				})
+				return
+			}
 			if (!rooms.has(normalizedKey)) return
+
+			const room = rooms.get(normalizedKey)
+			if (room) {
+				// ensure we don't keep duplicates - replace if socketObjectId exists
+				try {
+					const objData = data.object as Record<string, unknown>
+					const objId = objData?.socketObjectId as string | undefined
+					if (objId) {
+						const idx = room.canvasObjects.findIndex((o: unknown) => {
+							const oo = o as Record<string, unknown>
+							return oo.socketObjectId === objId
+						})
+						if (idx !== -1) {
+							room.canvasObjects[idx] = data.object
+						} else {
+							room.canvasObjects.push(data.object)
+						}
+					} else {
+						room.canvasObjects.push(data.object)
+					}
+				} catch (e) {
+					room.canvasObjects.push(data.object)
+				}
+			}
 
 			socket.to(normalizedKey).emit('object:added_s', { object: data.object })
 		})
@@ -25,7 +105,41 @@ export function DrawHandler(io: Server) {
 				!socket.rooms.has(normalizedKey)
 			)
 				return
+
+			if (
+				!checkRateLimit(socket.id, 'modified', MAX_EVENTS_PER_SECOND.modified)
+			) {
+				console.warn(
+					`[SPAM PROTECTION] Socket ${socket.id} превысил лимит модификаций`,
+				)
+				socket.emit('error', {
+					code: 'RATE_LIMIT_EXCEEDED',
+					message: 'Слишком быстрые события модификации объектов',
+				})
+				return
+			}
 			if (!rooms.has(normalizedKey)) return
+
+			const room = rooms.get(normalizedKey)
+			if (room && data.object) {
+				const objectData = data.object as Record<string, unknown>
+				const objectId = objectData.socketObjectId as string | undefined
+				if (objectId) {
+					const index = room.canvasObjects.findIndex((obj: unknown) => {
+						const o = obj as Record<string, unknown>
+						return o.socketObjectId === objectId
+					})
+					if (index !== -1) {
+						room.canvasObjects[index] = data.object
+					} else {
+						// If we don't have it yet (some clients send modify before add), add it
+						room.canvasObjects.push(data.object)
+					}
+				} else {
+					// no id - best effort: push
+					room.canvasObjects.push(data.object)
+				}
+			}
 
 			socket
 				.to(normalizedKey)
@@ -40,7 +154,33 @@ export function DrawHandler(io: Server) {
 				!socket.rooms.has(normalizedKey)
 			)
 				return
+
+			if (
+				!checkRateLimit(socket.id, 'cleared', MAX_EVENTS_PER_SECOND.cleared)
+			) {
+				console.warn(
+					`[SPAM PROTECTION] Socket ${socket.id} превысил лимит очистки холста`,
+				)
+				socket.emit('error', {
+					code: 'RATE_LIMIT_EXCEEDED',
+					message: 'Слишком частые попытки очистки холста',
+				})
+				return
+			}
 			if (!rooms.has(normalizedKey)) return
+			const room = rooms.get(normalizedKey)
+			const roomUser = room?.users?.find((u: User) => u.id === socket.id)
+			if (!roomUser?.admin) {
+				socket.emit('error', {
+					code: 'FORBIDDEN',
+					message: 'Только админ комнаты может очистить холст',
+				})
+				return
+			}
+
+			if (room) {
+				room.canvasObjects = []
+			}
 
 			socket.to(normalizedKey).emit('canvas:clear_s')
 		})
@@ -56,6 +196,27 @@ export function DrawHandler(io: Server) {
 				)
 					return
 				if (!rooms.has(normalizedKey)) return
+
+				if (
+					!checkRateLimit(socket.id, 'removed', MAX_EVENTS_PER_SECOND.removed)
+				) {
+					console.warn(
+						`[SPAM PROTECTION] Socket ${socket.id} превысил лимит удаления объектов`,
+					)
+					socket.emit('error', {
+						code: 'RATE_LIMIT_EXCEEDED',
+						message: 'Слишком частые удаления объектов',
+					})
+					return
+				}
+
+				const room = rooms.get(normalizedKey)
+				if (room) {
+					room.canvasObjects = room.canvasObjects.filter((obj: unknown) => {
+						const o = obj as Record<string, unknown>
+						return o.socketObjectId !== data.objectId
+					})
+				}
 
 				socket
 					.to(normalizedKey)

@@ -18,7 +18,6 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 	const [inputName, setInputName] = useState<string>('')
 	const [error, setError] = useState<string>('')
 	const [isLoading, setIsLoading] = useState(false)
-	const [isCreating, setIsCreating] = useState(false)
 
 	useEffect(() => {
 		setMode(initialMode)
@@ -31,7 +30,6 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 
 
 		const title = inputName.trim() || 'Новая доска'
-		setIsCreating(true)
 		setError('')
 
 		try {
@@ -43,11 +41,9 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 			}
 
 			const board = await BoardAPI.createBoard(title, roomKey)
-			navigate(`/editor?boardId=${board.id}`)
+			navigate(`/canvas?boardId=${board.id}`)
 		} catch {
 			setError('Не удалось создать доску')
-		} finally {
-			setIsCreating(false)
 		}
 	}
 

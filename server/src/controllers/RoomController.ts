@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { createRoomRecord, rooms } from '../store/rooms'
+import { createRoomRecord, ensureRoomRecord } from '../store/rooms'
 import { normalizeRoomKey } from '../utils/NormalizeRoomKey'
 
 export function RoomController() {
@@ -26,14 +26,14 @@ export function RoomController() {
 			return
 		}
 
-		const room = rooms.get(normalizedKey)
-
-		if (room) {
-			res.json({ exists: true, key: room.key, users: room.users })
-			console.log(`Вы подключились к комнате ${room.key}`)
-		} else {
-			res.status(404).json({ exists: false, message: 'Комната не найдена' })
-		}
+		const room = ensureRoomRecord(normalizedKey)
+		res.json({
+			exists: true,
+			key: room.key,
+			users: room.users,
+			joinRequests: room.joinRequests,
+		})
+		console.log(`Вы подключились к комнате ${room.key}`)
 	}
 
 	// PostSection

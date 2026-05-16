@@ -1,14 +1,17 @@
-//ЗАМЕНИТЬ 
+//ЗАМЕНИТЬ
 export const AUTH_TOKEN_KEY = 'sketchroom_token'
+export const REFRESH_TOKEN_KEY = 'sketchroom_refresh_token'
 
 export interface AuthUser {
 	userId: string
 	email: string
+	name?: string
 }
 
 interface JwtPayload {
 	userId?: string
 	email?: string
+	name?: string
 }
 
 const parseJwtPayload = (token: string): JwtPayload | null => {
@@ -37,6 +40,23 @@ export const clearAuthToken = () => {
 	localStorage.removeItem(AUTH_TOKEN_KEY)
 }
 
+export const saveRefreshToken = (token: string) => {
+	localStorage.setItem(REFRESH_TOKEN_KEY, token)
+}
+
+export const getRefreshToken = () => {
+	return localStorage.getItem(REFRESH_TOKEN_KEY)
+}
+
+export const clearRefreshToken = () => {
+	localStorage.removeItem(REFRESH_TOKEN_KEY)
+}
+
+export const clearAuth = () => {
+	clearAuthToken()
+	clearRefreshToken()
+}
+
 export const getAuthUser = (): AuthUser | null => {
 	const token = getAuthToken()
 	if (!token) return null
@@ -47,6 +67,7 @@ export const getAuthUser = (): AuthUser | null => {
 	return {
 		userId: payload.userId,
 		email: payload.email,
+		name: payload.name,
 	}
 }
 

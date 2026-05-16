@@ -1,6 +1,6 @@
+import { IoText } from "react-icons/io5"
 import { LuBrush, LuEraser, LuLetterText, LuTrash2 } from "react-icons/lu"
 import { PiSelectionPlusBold } from "react-icons/pi"
-import { IoText } from "react-icons/io5"
 
 
 interface ToolbarProps {
@@ -13,6 +13,7 @@ interface ToolbarProps {
 	eraserSize: number
 	setEraserSize: (size: number) => void
 	onClear: () => void
+	canClear: boolean
 	isDrawingMode: boolean
 	setIsDrawingMode: (isDrawingMode: boolean) => void
 	isEditingMode: boolean
@@ -33,6 +34,7 @@ export const Toolbar = ({
 	eraserSize,
 	setEraserSize,
 	onClear,
+	canClear,
 	isDrawingMode,
 	setIsDrawingMode,
 	isEditingMode,
@@ -65,11 +67,10 @@ export const Toolbar = ({
 					<button
 						onClick={() => setTextSize(20)}
 						title="Small"
-						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[14px] font-bold transition-all ${
-							textSize === 20
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[14px] font-bold transition-all ${textSize === 20
 								? 'bg-slate-900 text-white shadow-sm'
 								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-						}`}
+							}`}
 					>
 						{<IoText />}
 					</button>
@@ -77,11 +78,10 @@ export const Toolbar = ({
 					<button
 						onClick={() => setTextSize(40)}
 						title="Medium"
-						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[18px] font-bold transition-all ${
-							textSize === 40
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[18px] font-bold transition-all ${textSize === 40
 								? 'bg-slate-900 text-white shadow-sm'
 								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-						}`}
+							}`}
 					>
 						{/*large*/}
 						{<IoText />}
@@ -89,11 +89,10 @@ export const Toolbar = ({
 					<button
 						onClick={() => setTextSize(80)}
 						title="Large"
-						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[22px] font-bold transition-all ${
-							textSize === 80
+						className={`flex h-9 w-9 items-center justify-center rounded-lg text-[22px] font-bold transition-all ${textSize === 80
 								? 'bg-slate-900 text-white shadow-sm'
 								: 'bg-slate-100 text-slate-800 hover:bg-slate-200'
-						}`}
+							}`}
 					>
 						{<IoText />}
 					</button>
@@ -176,7 +175,9 @@ export const Toolbar = ({
 				</button>
 				<button
 					onClick={onClear}
-					className='rounded-lg bg-rose-500 px-3 py-2 text-xl font-medium text-white transition hover:bg-rose-600'
+					disabled={!canClear}
+					title={canClear ? 'Очистить холст' : 'Только админ комнаты может очистить холст'}
+					className='rounded-lg bg-rose-500 px-3 py-2 text-xl font-medium text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-rose-500'
 				>
 					{<LuTrash2 />}
 				</button>

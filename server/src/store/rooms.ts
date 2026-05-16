@@ -9,6 +9,8 @@ export const createRoomRecord = (forcedKey?: string) => {
 		key,
 		createdAt: new Date(),
 		users: [],
+		joinRequests: [],
+		canvasObjects: [],
 	}
 
 	rooms.set(key, room)
