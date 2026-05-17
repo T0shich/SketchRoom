@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY ./prisma/ ./prisma/
 COPY src ./src
-RUN npx prisma generate 
+RUN npx prisma generate --schema=./prisma/schema/schema.prisma
 RUN npm run build
 
 FROM node:22-alpine AS runner
@@ -21,4 +21,4 @@ COPY package.json ./
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/app.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=./prisma/schema/schema.prisma && node dist/app.js"]
