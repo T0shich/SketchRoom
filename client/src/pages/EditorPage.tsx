@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import SideBar from '../components/SideBar'
 import { DrawingCanvas } from '../modules/canvas'
+import { Rooms } from '../modules/rooms'
 import { getAuthToken, getAuthUser } from '../store/Auth'
 import { BoardAPI, type Board, type CanvasSnapshot } from '../store/BoardAPI'
 import { useFabric } from '../store/useFabric'
@@ -59,7 +60,9 @@ const EditorPage = () => {
 	const token = getAuthToken()
 	const user = getAuthUser()
 	const authenticated = Boolean(token && user)
+	const modeQuery = searchParams.get('mode')
 	const boardId = searchParams.get('boardId')
+	const initialMode = modeQuery === 'join' ? 'join' : 'create'
 	const fabricRef = useFabric(state => state.fabricRef)
 
 	const [isConnecting, setIsConnecting] = useState(false)
@@ -82,9 +85,10 @@ const EditorPage = () => {
 		activeRoomKey && roomUsers.find(u => u.id === socketId)?.admin,
 	)
 
-	// Normalize /canvas URL params to avoid mixed/invalid states:
-	// boardId > roomKey
+	// Normalize /editor URL params to avoid mixed/invalid states:
+	// boardId > roomKey > mode(create|join)
 	useEffect(() => {
+		const currentMode = searchParams.get('mode')
 		const currentBoardId = searchParams.get('boardId')
 		const currentRoomKey = searchParams.get('roomKey')
 
@@ -93,6 +97,8 @@ const EditorPage = () => {
 			next.set('boardId', currentBoardId)
 		} else if (currentRoomKey) {
 			next.set('roomKey', currentRoomKey.toUpperCase())
+		} else if (currentMode === 'create' || currentMode === 'join') {
+			next.set('mode', currentMode)
 		}
 
 		if (next.toString() !== searchParams.toString()) {
@@ -101,14 +107,14 @@ const EditorPage = () => {
 	}, [searchParams, setSearchParams])
 
 	useEffect(() => {
-		if (isSaving) {
+		if(isSaving){
 			setSaveStatus('Сохранение...')
 		}
 		let timer = setTimeout(() => {
-			setSaveStatus('')
+				setSaveStatus('')
 		}, 3000)
-		return () => clearTimeout(timer)
-	}, [isSaving, saveStatus])
+			return () => clearTimeout(timer)
+	},[isSaving , saveStatus])
 
 	useEffect(() => {
 		const handleConnect = () => {
@@ -328,6 +334,19 @@ const EditorPage = () => {
 			})
 	}, [authenticated, token, boardId])
 
+	const handleJoinRoom = (key: string) => {
+		const upperKey = key.toUpperCase()
+		setJoinError('')
+
+		if (!socket.connected) {
+			setJoinError('Нет соединения с сервером')
+			return
+		}
+
+		const userName = user?.name || user?.email
+		socket.emit('joinRoom', { roomKey: upperKey, userName })
+	}
+
 	const handleApproveJoinRequest = (userId: string) => {
 		if (!activeRoomKey) return
 		if (!socket.connected) {
@@ -434,7 +453,22 @@ const EditorPage = () => {
 	}
 
 	if (!activeRoomKey && !boardId) {
-		return <Navigate to='/editor?mode=create' replace />
+		return (
+			<div className='flex min-h-screen items-center justify-center bg-slate-100 p-6'>
+				<div className='w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-sm'>
+					<div className='mb-1 text-sm text-slate-500'>SketchRoom</div>
+					<h1 className='mb-4 text-2xl font-semibold text-slate-900'>Совместная доска</h1>
+					<div className='mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
+						Аккаунт: {user.email}
+					</div>
+					<div className='mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500'>
+						{isConnecting ? `Подключено • ${socketId}` : 'Подключение к серверу...'}
+					</div>
+					<Rooms onJoinRoom={handleJoinRoom} initialMode={initialMode} />
+					{joinError && <div className='mt-3 text-sm text-rose-500'>{joinError}</div>}
+				</div>
+			</div>
+		)
 	}
 
 	if (!activeRoomKey && boardId) {
@@ -515,7 +549,7 @@ const EditorPage = () => {
 													</button>
 												</div>
 											</div>
-										)
+									)
 									})}
 									{joinRequestError && (
 										<div className='pointer-events-auto rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-500'>

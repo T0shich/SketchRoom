@@ -63,7 +63,7 @@ const BoardList = () => {
 			}
 
 			const board = await BoardAPI.createBoard(title, roomKey)
-			navigate(`/canvas?boardId=${board.id}`)
+			navigate(`/editor?boardId=${board.id}`)
 		} catch {
 			setError('Не удалось создать доску')
 		} finally {
@@ -117,7 +117,7 @@ const BoardList = () => {
 									key={item.id}
 									title={item.title}
 									lastUpdated={formatDate(item.updatedAt)}
-									onOpen={() => navigate(`/canvas?boardId=${item.id}`)}
+									onOpen={() => navigate(`/editor?boardId=${item.id}`)}
 									onDownloadPng={() => handleDownloadPng(item.id, item.title)}
 									downloadDisabled={downloadingBoardId === item.id}
 									downloadLabel={downloadingBoardId === item.id ? '...' : 'PNG'}

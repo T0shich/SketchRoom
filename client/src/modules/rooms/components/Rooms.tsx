@@ -41,7 +41,7 @@ export const Rooms = ({ onJoinRoom, initialMode = 'create' }: RoomsProps) => {
 			}
 
 			const board = await BoardAPI.createBoard(title, roomKey)
-			navigate(`/canvas?boardId=${board.id}`)
+			navigate(`/editor?boardId=${board.id}`)
 		} catch {
 			setError('Не удалось создать доску')
 		}
