@@ -135,7 +135,26 @@ const EditorPage = () => {
 		}
 
 		const handleJoinedRoom = (response: JoinedRoomResponse) => {
-			if (response.success && response.roomKey) {
+			if (!response.roomKey) {
+				setJoinError(response.message || 'Не удалось войти в комнату')
+				return
+			}
+
+			// Update URL and roomKey even if success is false (e.g., waiting for approval)
+			try {
+				const current = new URLSearchParams(window.location.search)
+				const currentBoardId = current.get('boardId')
+				if (!currentBoardId) {
+					// canonical room route: roomKey-only
+					setSearchParams({ roomKey: response.roomKey }, { replace: true })
+				}
+			} catch {
+				// ignore
+			}
+
+			setRoomKey(response.roomKey)
+
+			if (response.success) {
 				setJoinError('')
 				if (Array.isArray(response.users)) {
 					setRoomUsers(response.users)
@@ -144,33 +163,15 @@ const EditorPage = () => {
 					setJoinRequests(response.joinRequests)
 				}
 
-				// Update URL first to avoid a transient state where roomKey is set
-				// but URL still doesn't contain `roomKey` (which could trigger a leave).
-				try {
-					const current = new URLSearchParams(window.location.search)
-					const currentBoardId = current.get('boardId')
-					if (currentBoardId) {
-						// canonical board route stays boardId-only
-						setSearchParams({ boardId: currentBoardId }, { replace: true })
-					} else {
-						// canonical room route: roomKey-only
-						setSearchParams({ roomKey: response.roomKey }, { replace: true })
-					}
-				} catch {
-					// ignore
-				}
-
-				setRoomKey(response.roomKey)
-
 				// Ensure we fetch the current canvas state after we are actually joined.
 				// This is important for the approve-join flow (user may not have requested state yet).
 				if (socket.connected) {
 					socket.emit('requestCanvasState', response.roomKey)
 				}
-				return
+			} else {
+				// User is waiting for approval
+				setJoinError(response.message || 'Ожидание подтверждения входа...')
 			}
-
-			setJoinError(response.message || 'Не удалось войти в комнату')
 		}
 
 		socket.on('connect', handleConnect)
