@@ -12,7 +12,7 @@
 		"prisma:status": "prisma migrate status"
 	},
 	"prisma": {
-		"schema": "prisma/schema"
+		"schema": "prisma/schema.prisma"
 	},
 	"keywords": [],
 	"author": "",
