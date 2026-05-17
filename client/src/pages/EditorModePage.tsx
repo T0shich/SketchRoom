@@ -7,7 +7,6 @@ const EditorModePage = () => {
 	const navigate = useNavigate()
 	const token = getAuthToken()
 	const user = getAuthUser()
-	const authenticated = Boolean(token && user)
 	const modeQuery = searchParams.get('mode')
 	const initialMode = modeQuery === 'join' ? 'join' : 'create'
 
@@ -15,7 +14,7 @@ const EditorModePage = () => {
 		navigate(`/canvas?roomKey=${key.toUpperCase()}`)
 	}
 
-	if (!authenticated) {
+	if (!token || !user) {
 		return <Navigate to='/login' replace />
 	}
 
