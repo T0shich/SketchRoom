@@ -4,10 +4,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY tsconfig.json ./
 RUN npm ci
-COPY ./prisma/ ./prisma/
-RUN npx prisma generate --schema=./prisma/schema/schema.prisma
-COPY src ./src
 
+COPY ./prisma/ ./prisma/
+COPY src ./src
+RUN npx prisma generate --schema=./prisma/schema/schema.prisma
 RUN npm run build
 
 FROM node:22-alpine AS runner
@@ -17,6 +17,8 @@ ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
+
+COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy --schema=./prisma/schema/schema.prisma && node dist/app.js"]
