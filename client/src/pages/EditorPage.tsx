@@ -107,14 +107,14 @@ const EditorPage = () => {
 	}, [searchParams, setSearchParams])
 
 	useEffect(() => {
-		if(isSaving){
+		if (isSaving) {
 			setSaveStatus('Сохранение...')
 		}
 		let timer = setTimeout(() => {
-				setSaveStatus('')
+			setSaveStatus('')
 		}, 3000)
-			return () => clearTimeout(timer)
-	},[isSaving , saveStatus])
+		return () => clearTimeout(timer)
+	}, [isSaving, saveStatus])
 
 	useEffect(() => {
 		const handleConnect = () => {
@@ -126,18 +126,15 @@ const EditorPage = () => {
 			setIsConnecting(false)
 			setSocketId('')
 			setRoomKey(null)
-			try {
-				const current = new URLSearchParams(window.location.search)
-				// keep boardId if present, otherwise just drop roomKey
-				if (current.get('boardId')) {
-					setSearchParams({ boardId: String(current.get('boardId')) }, { replace: true })
-				} else {
-					current.delete('roomKey')
-					setSearchParams(current, { replace: true })
+			setSearchParams((prev) => {
+				const boardId = prev.get('boardId')
+				if (boardId) {
+					return { boardId }
 				}
-			} catch {
-				// ignore
-			}
+				const next = new URLSearchParams(prev)
+				next.delete('roomKey')
+				return next
+			}, { replace: true })
 		}
 
 		const handleJoinedRoom = (response: JoinedRoomResponse) => {
@@ -152,19 +149,15 @@ const EditorPage = () => {
 
 				// Update URL first to avoid a transient state where roomKey is set
 				// but URL still doesn't contain `roomKey` (which could trigger a leave).
-				try {
-					const current = new URLSearchParams(window.location.search)
-					const currentBoardId = current.get('boardId')
+				setSearchParams((prev) => {
+					const currentBoardId = prev.get('boardId')
 					if (currentBoardId) {
 						// canonical board route stays boardId-only
-						setSearchParams({ boardId: currentBoardId }, { replace: true })
-					} else {
-						// canonical room route: roomKey-only
-						setSearchParams({ roomKey: response.roomKey }, { replace: true })
+						return { boardId: currentBoardId }
 					}
-				} catch {
-					// ignore
-				}
+					// canonical room route: roomKey-only
+					return { roomKey: response.roomKey }
+				}, { replace: true })
 
 				setRoomKey(response.roomKey)
 
@@ -189,11 +182,12 @@ const EditorPage = () => {
 			setRoomUsers([])
 
 			// In direct room mode (no boardId), return user to join/create screen.
-			const current = new URLSearchParams(window.location.search)
-			if (!current.get('boardId')) {
-				setRoomKey(null)
-				setSearchParams({ mode: 'join' }, { replace: true })
-			}
+			setSearchParams((prev) => {
+				if (!prev.get('boardId')) {
+					return { mode: 'join' }
+				}
+				return prev
+			}, { replace: true })
 
 			if (socket.connected) {
 				socket.emit('leaveRoom', kickedRoomKey)
@@ -549,7 +543,7 @@ const EditorPage = () => {
 													</button>
 												</div>
 											</div>
-									)
+										)
 									})}
 									{joinRequestError && (
 										<div className='pointer-events-auto rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs text-rose-500'>
