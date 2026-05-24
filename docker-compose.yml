@@ -1,0 +1,37 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sketchroom
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/sketchroom
+      JWT_SECRET: 'change_this_secret'
+    depends_on:
+      - postgres
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      - server
+
+volumes:
+  db-data:
