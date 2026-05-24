@@ -17,7 +17,9 @@ const GenerativeBackground = () => {
 			canvas.height = window.innerHeight
 		}
 
-		const particles = Array.from({ length: 200 }, () => ({ 
+		resizeCanvas()
+
+		const particles = Array.from({ length: 200 }, () => ({
 			x: Math.random() * canvas.width,
 			y: Math.random() * canvas.height,
 			vx: 0,
@@ -27,20 +29,20 @@ const GenerativeBackground = () => {
 			myRandom: Math.random() * 1000
 		}))
 
-	
+
 		const getValueAt = (x: number, y: number) => {
-			
+
 			const scale = 0.003
 			return (Math.sin(x * scale) + Math.cos(y * scale)) * Math.PI * 2
 		}
 
 		const render = () => {
-			ctx.fillStyle = 'rgba(240, 242, 245, 0.02)' 
+			ctx.fillStyle = 'rgba(240, 242, 245, 0.02)'
 			ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-			ctx.strokeStyle = 'rgba(100, 116, 139, 0.8)' 
+			ctx.strokeStyle = 'rgba(100, 116, 139, 0.8)'
 			ctx.lineWidth = 1
-			ctx.lineCap = 'round' 
+			ctx.lineCap = 'round'
 
 			particles.forEach(p => {
 				p.oldX = p.x
@@ -49,8 +51,8 @@ const GenerativeBackground = () => {
 				const angle = getValueAt(p.x, p.y)
 
 				const speed = 1.5
-				p.vx = Math.cos(angle) * speed 
-				p.vy = Math.sin(angle) * speed 
+				p.vx = Math.cos(angle) * speed
+				p.vy = Math.sin(angle) * speed
 
 				p.x += p.vx
 				p.y += p.vy
@@ -64,7 +66,7 @@ const GenerativeBackground = () => {
 				if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) {
 					p.x = Math.random() * canvas.width
 					p.y = Math.random() * canvas.height
-					p.oldX = p.x 
+					p.oldX = p.x
 					p.oldY = p.y
 				}
 			})
@@ -73,7 +75,6 @@ const GenerativeBackground = () => {
 		}
 
 		window.addEventListener('resize', resizeCanvas)
-		resizeCanvas()
 
 		render()
 
