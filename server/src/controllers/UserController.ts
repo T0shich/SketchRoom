@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import { hashPassword } from '../utils/Hashing'
 import { prisma } from '../types/Prisma'
+import { hashPassword } from '../utils/Hashing'
 
 export function UserController() {
 	const updateUser = async (req: Request, res: Response) => {
@@ -12,7 +12,10 @@ export function UserController() {
 				return
 			}
 			const hashedPassword = hashPassword(password)
-			if (prisma.user.findUnique({ where: { id: String(id) } }) === null) {
+			const existingUser = await prisma.user.findUnique({
+				where: { id: String(id) },
+			})
+			if (!existingUser) {
 				res.status(404).json({ message: 'Пользователь не найден' })
 				return
 			}
@@ -74,7 +77,7 @@ export function UserController() {
 		}
 	}
 
-	return{
+	return {
 		updateUser,
 		deleteUser,
 		getUser,

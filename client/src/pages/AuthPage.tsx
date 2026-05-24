@@ -1,13 +1,14 @@
-import { Link } from 'react-router-dom'
-import { clearAuthToken, getAuthUser, isAuthenticated } from '../store/Auth'
+import { Link, useNavigate } from 'react-router-dom'
 import GenerativeBackground from '../components/GenerativeBackground'
+import { clearAuthToken, getAuthUser, isAuthenticated } from '../store/Auth'
 const AuthPage = () => {
 	const user = getAuthUser()
 	const authenticated = isAuthenticated()
+	const navigate = useNavigate()
 
 	const handleLogout = () => {
 		clearAuthToken()
-		window.location.href = '/'
+		navigate('/')
 	}
 
 
